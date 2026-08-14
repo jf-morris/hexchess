@@ -1,0 +1,2 @@
+# hexchess
+Hexagonal Chess
