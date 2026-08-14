@@ -2,7 +2,7 @@
 
 
 
-\_\_J.F. Morris | August 2026\_\_
+__J.F. Morris | August 2026__
 
 
 
@@ -34,7 +34,7 @@ rules:
   * [McCooey's Hexagonal Chess](https://en.wikipedia.org/wiki/Hexagonal_chess#McCooey's_hexagonal_chess)
   * [Gliński's Hexagonal Chess](https://en.wikipedia.org/wiki/Hexagonal_chess#Gliński's_hexagonal_chess)
   * [Shafran's Hexagonal Chess](https://en.wikipedia.org/wiki/Hexagonal_chess#Shafran's_hexagonal_chess),
-* **Six visual themes**, from a wood-and-felt table to Van Gogh's \_The Starry Night\_
+* **Six visual themes**, from a wood-and-felt table to Van Gogh's _The Starry Night_
 * **Play against the computer**, as either color — it searches a couple of
 moves ahead and picks from its best options with some deliberate
 imperfection, so it doesn't play a mechanically identical game every time
