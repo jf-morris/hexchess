@@ -1,0 +1,2874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;1,400;1,600&family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&family=Monoton&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<title>Hex Chess — Playable Prototype</title>
+<style>
+  :root {
+    --bg: #1c2622;
+    --panel: #24312b;
+    --ink: #ece6d6;
+    --ink-dim: #9fab9f;
+    --cell-light: #e9d9ac;
+    --cell-mid: #c79a52;
+    --cell-dark: #7c5330;
+    --cell-light-hover: #f5e8bf;
+    --cell-mid-hover: #d9ac66;
+    --cell-dark-hover: #8f6440;
+    --line: #10160f;
+    --accent: #6fae8e;
+
+    /* Typography + structural tokens -- the rest of the theme. */
+    --font-display: Georgia, 'Times New Roman', serif;
+    --font-display-style: normal;
+    --font-display-weight: 400;
+    --font-display-transform: none;
+    --font-display-tracking: 0.04em;
+    --font-body: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+    --font-ui: 'Helvetica Neue', Arial, sans-serif;
+    --radius-panel: 12px;
+    --radius-control: 7px;
+    --cell-stroke-width: 1;
+    --bg-glow: radial-gradient(circle at 50% -10%, rgba(111,174,142,0.08), transparent 60%);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    background-image: var(--bg-glow);
+    color: var(--ink);
+    font-family: var(--font-body);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 12px 40px;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: var(--font-display-weight);
+    font-style: var(--font-display-style);
+    text-transform: var(--font-display-transform);
+    letter-spacing: var(--font-display-tracking);
+    font-size: clamp(1.3rem, 3.2vw, 1.9rem);
+    margin: 0;
+    color: var(--ink);
+  }
+
+  .subtitle {
+    font-family: var(--font-body);
+    font-style: italic;
+    color: var(--ink-dim);
+    font-size: 0.95rem;
+    margin-top: 6px;
+  }
+  [data-theme="constructivist"] .subtitle {
+    font-family: var(--font-ui);
+    font-style: normal;
+    letter-spacing: 0.03em;
+  }
+
+  .settings-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 26px;
+    opacity: 0.85;
+  }
+
+  .board-wrap {
+    margin-top: 10px;
+    padding: 10px;
+    background: var(--panel);
+    border-radius: var(--radius-panel);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.03);
+    width: 100%;
+    max-width: 736px; /* board's natural ~720px + this padding */
+    transition: background-color 0.3s ease;
+    position: relative;
+  }
+
+  .promotion-modal {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    border-radius: var(--radius-panel);
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+  .promotion-modal.show { display: flex; }
+  .promotion-card {
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: var(--radius-panel);
+    padding: 18px 20px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+    text-align: center;
+  }
+  .promotion-title {
+    font-family: var(--font-ui);
+    font-size: 0.85rem;
+    color: var(--ink-dim);
+    margin-bottom: 12px;
+    letter-spacing: 0.03em;
+  }
+  .promotion-options {
+    display: flex;
+    gap: 10px;
+  }
+  .promotion-option {
+    width: 56px;
+    height: 56px;
+    padding: 6px;
+    background: var(--bg);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: var(--radius-control);
+    cursor: pointer;
+    transition: transform 0.12s ease, background 0.12s ease;
+  }
+  .promotion-option:hover {
+    background: var(--accent);
+    transform: translateY(-2px);
+  }
+  .promotion-option svg { width: 100%; height: 100%; }
+
+  .menu-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.72);
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  .menu-overlay.show { display: flex; }
+  .menu-card {
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: var(--radius-panel);
+    padding: 28px 32px;
+    box-shadow: 0 30px 70px rgba(0,0,0,0.5);
+    width: 100%;
+    max-width: 340px;
+    transition: background-color 0.3s ease;
+  }
+  .menu-title {
+    font-family: var(--font-display);
+    font-weight: var(--font-display-weight);
+    font-style: var(--font-display-style);
+    text-transform: var(--font-display-transform);
+    letter-spacing: var(--font-display-tracking);
+    font-size: 1.5rem;
+    margin: 0 0 22px;
+    text-align: center;
+    color: var(--ink);
+  }
+  .menu-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+    font-family: var(--font-ui);
+    font-size: 0.85rem;
+    color: var(--ink-dim);
+  }
+  .menu-row select {
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: var(--radius-control);
+    padding: 8px 10px;
+    font-family: var(--font-ui);
+    font-size: 0.9rem;
+  }
+  .menu-row-checkbox {
+    flex-direction: row;
+    align-items: center;
+    font-size: 0.9rem;
+    color: var(--ink);
+  }
+  #computer-color-row.hidden { display: none; }
+  .menu-radio-group {
+    display: flex;
+    gap: 16px;
+    font-size: 0.9rem;
+    color: var(--ink);
+  }
+  .menu-radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+  }
+  .menu-start-btn {
+    width: 100%;
+    margin-top: 6px;
+    padding: 12px;
+    font-size: 0.95rem;
+  }
+
+  #board-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-width: 720px;
+  }
+
+  /* Same duration + easing on both is what makes the cancellation
+     work at every instant, not just at the endpoints -- see the
+     setFlipped() implementation for the math. */
+  #board-group {
+    transition: transform 0.9s cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  .piece-inner, .coord-label {
+    transition: transform 0.9s cubic-bezier(0.65, 0, 0.35, 1);
+  }
+
+  .flip-controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 14px;
+    font-family: var(--font-ui);
+    font-size: 0.85rem;
+    color: var(--ink-dim);
+  }
+  .flip-btn {
+    background: var(--panel);
+    color: var(--ink);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: var(--radius-control);
+    padding: 7px 14px;
+    font-family: var(--font-ui);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .flip-btn:hover { background: #2d3c34; }
+  .flip-btn:disabled { opacity: 0.4; cursor: default; }
+  .flip-btn:disabled:hover { background: var(--panel); }
+  .flip-controls label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+
+  .cell {
+    stroke: var(--line);
+    stroke-width: var(--cell-stroke-width);
+    cursor: pointer;
+    transition: fill 0.12s ease;
+  }
+  .cell.light { fill: var(--cell-light); }
+  .cell.mid   { fill: var(--cell-mid); }
+  .cell.dark  { fill: var(--cell-dark); }
+  .cell.light:hover { fill: var(--cell-light-hover); }
+  .cell.mid:hover   { fill: var(--cell-mid-hover); }
+  .cell.dark:hover  { fill: var(--cell-dark-hover); }
+  .cell.selected { fill: var(--accent) !important; }
+
+  .move-dot {
+    fill: var(--move-dot-color, rgba(20, 24, 18, 0.55));
+    pointer-events: none;
+  }
+  .capture-ring {
+    fill: none;
+    stroke: var(--alert-color, rgba(180, 40, 30, 0.85));
+    stroke-width: var(--alert-ring-width, 3);
+    pointer-events: none;
+  }
+
+  /* Real piece artwork (currently: Merida, GPLv2+) is embedded as a
+     nested <svg> per piece and carries its OWN colours (plain black/
+     white, by original design) -- deliberately NOT re-themed here,
+     per current request. pointer-events:none so clicks pass through
+     to the cell polygon underneath. */
+  .piece-art {
+    pointer-events: none;
+  }
+  .piece-art.sliding {
+    transition: transform 0.32s ease;
+  }
+  .piece-art.capture-fade {
+    transition: opacity 0.28s ease;
+    opacity: 0;
+  }
+
+  /* Kept for later: this was the medallion+glyph look used before
+     switching to real piece artwork above. Revive by having
+     renderPieces() draw these again instead of/alongside .piece-art
+     if we want the guaranteed-contrast backing for a themed piece
+     colour scheme later. */
+  .piece-medallion {
+    pointer-events: none;
+    stroke-width: 2;
+    stroke-linejoin: round;
+  }
+  .piece-medallion.white { fill: var(--piece-white-fill, #f6efd9); stroke: var(--piece-white-stroke, #2a2018); }
+  .piece-medallion.black { fill: var(--piece-black-fill, #241a12); stroke: var(--piece-black-stroke, #f6efd9); }
+  .piece {
+    pointer-events: none;
+    font-size: 20px;
+    text-anchor: middle;
+    dominant-baseline: central;
+    user-select: none;
+  }
+  .piece.white { fill: var(--piece-white-stroke, #2a2018); }
+  .piece.black { fill: var(--piece-black-stroke, #f6efd9); }
+
+  #turn-indicator {
+    margin-top: 4px;
+    font-family: var(--font-body);
+    font-style: italic;
+    font-size: 1rem;
+    color: var(--ink);
+  }
+  #turn-indicator .swatch {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 7px;
+    position: relative;
+    top: -1px;
+  }
+  #turn-indicator.white .swatch { background: #ffffff; border: 1px solid #2a2018; }
+  #turn-indicator.black .swatch { background: #241a12; border: 1px solid #f6efd9; }
+  #turn-indicator .status { color: #d9847a; font-style: normal; margin-left: 4px; }
+  #turn-indicator .move-count { color: var(--ink-dim); font-style: normal; font-size: 0.85rem; margin-left: 8px; }
+
+  .captured-tray {
+    width: 100%;
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: var(--panel);
+    border-radius: var(--radius-control);
+    font-family: var(--font-ui);
+    transition: background-color 0.3s ease;
+  }
+  .captured-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 26px;
+  }
+  .captured-row + .captured-row { margin-top: 4px; }
+  .captured-label {
+    font-size: 0.75rem;
+    color: var(--ink-dim);
+    width: 38px;
+    flex-shrink: 0;
+  }
+  .captured-icons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+  }
+  .captured-piece-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+  #material-diff {
+    margin-top: 4px;
+    font-size: 0.75rem;
+    color: var(--accent);
+    text-align: right;
+    min-height: 1em;
+  }
+
+  .cell.in-check {
+    fill: var(--alert-color, #a33c33) !important;
+  }
+
+  #turn-indicator.gameover {
+    color: var(--accent);
+    font-style: normal;
+    font-weight: 600;
+  }
+
+  .game-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    margin-top: 10px;
+  }
+  @media (min-width: 900px) {
+    .game-layout {
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 32px;
+    }
+  }
+
+  /* On narrow screens, every pixel of padding directly steals width
+     from the board -- so mobile gets noticeably tighter margins than
+     desktop, where there's room to spare. */
+  @media (max-width: 480px) {
+    body { padding: 10px 6px 28px; }
+    .board-wrap { padding: 6px; border-radius: 8px; }
+  }
+
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 340px;
+  }
+  @media (min-width: 900px) {
+    .board-wrap { flex: 1 1 auto; }
+    .side-panel { flex: 0 0 320px; max-width: 320px; align-items: stretch; padding-top: 6px; }
+  }
+
+  .history-panel {
+    margin-top: 16px;
+    width: 100%;
+    background: var(--panel);
+    border-radius: var(--radius-panel);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(255,255,255,0.03);
+    overflow: hidden;
+    transition: background-color 0.3s ease;
+  }
+  .history-header {
+    padding: 10px 14px;
+    font-family: var(--font-body);
+    font-style: italic;
+    font-size: 0.9rem;
+    color: var(--ink-dim);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  [data-theme="constructivist"] .history-header { font-family: var(--font-ui); font-style: normal; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.78rem; }
+  #move-history-list {
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 4px 0;
+    font-family: var(--font-ui);
+    font-size: 0.85rem;
+  }
+  .move-row {
+    display: grid;
+    grid-template-columns: 32px 1fr 1fr;
+    padding: 4px 14px;
+  }
+  .move-row:nth-child(odd) { background: rgba(255,255,255,0.02); }
+  .move-num { color: var(--ink-dim); }
+  .move-white, .move-black { color: var(--ink); letter-spacing: 0.02em; }
+  .move-empty {
+    padding: 14px;
+    color: var(--ink-dim);
+    font-style: italic;
+    font-size: 0.85rem;
+    text-align: center;
+  }
+
+
+  .coord-label {
+    font-family: var(--font-ui);
+    font-size: 9px;
+    fill: rgba(16,22,15,0.55);
+    pointer-events: none;
+    user-select: none;
+  }
+
+  footer {
+    margin-top: 22px;
+    color: var(--ink-dim);
+    font-size: 0.85rem;
+    text-align: center;
+    max-width: 480px;
+    line-height: 1.5;
+    font-family: var(--font-body);
+  }
+  footer a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  footer a:hover {
+    text-decoration-thickness: 2px;
+  }
+  #about-note {
+    margin-top: 10px;
+    opacity: 0.85;
+  }
+  #credits-note {
+    margin-top: 6px;
+    font-size: 0.75rem;
+    opacity: 0.65;
+  }
+
+  #hover-readout {
+    margin-top: 14px;
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    color: var(--ink-dim);
+    letter-spacing: 0.03em;
+    min-height: 1.2em;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hex Chess</h1>
+  <div class="subtitle" id="variant-subtitle">McCooey's variant</div>
+</header>
+
+<div class="game-layout">
+  <div class="board-wrap">
+    <svg id="board-svg"></svg>
+    <div id="promotion-modal" class="promotion-modal">
+      <div class="promotion-card">
+        <div class="promotion-title">Promote to</div>
+        <div id="promotion-options" class="promotion-options"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="side-panel">
+    <div id="turn-indicator" class="white"><span class="swatch"></span>White to move</div>
+    <div id="hover-readout">&nbsp;</div>
+
+    <div class="captured-tray">
+      <div class="captured-row">
+        <span class="captured-label">White</span>
+        <div class="captured-icons" id="captured-by-white"></div>
+      </div>
+      <div class="captured-row">
+        <span class="captured-label">Black</span>
+        <div class="captured-icons" id="captured-by-black"></div>
+      </div>
+      <div id="material-diff"></div>
+    </div>
+
+    <div class="flip-controls">
+      <button id="undo-btn" class="flip-btn" type="button" disabled>Undo</button>
+      <button id="flip-btn" class="flip-btn" type="button">Flip board</button>
+      <label><input type="checkbox" id="auto-flip-checkbox" checked> Auto-flip</label>
+    </div>
+
+    <div class="history-panel">
+      <div class="history-header">Move history</div>
+      <div id="move-history-list"></div>
+    </div>
+  </div>
+</div>
+
+<div class="settings-bar">
+  <button id="new-game-btn" class="flip-btn" type="button">New game</button>
+</div>
+
+<div id="menu-overlay" class="menu-overlay">
+  <div class="menu-card">
+    <h2 class="menu-title">Hex Chess</h2>
+    <div class="menu-row">
+      <label for="variant-select">Variant</label>
+      <select id="variant-select">
+        <option value="mccooey">McCooey's Hexagonal Chess</option>
+        <option value="glinski">Gliński's Hexagonal Chess</option>
+        <option value="shafran">Shafran's Hexagonal Chess</option>
+      </select>
+    </div>
+    <div class="menu-row">
+      <label for="theme-select">Style</label>
+      <select id="theme-select">
+        <option value="woodFelt">Wood &amp; Felt</option>
+        <option value="constructivist">Origins</option>
+        <option value="greenGold">Green &amp; Gold</option>
+        <option value="blackWhite">Black &amp; White</option>
+        <option value="starryNight">Starry Night</option>
+        <option value="supernova">Supernova</option>
+      </select>
+    </div>
+    <div class="menu-row menu-row-checkbox">
+      <label><input type="checkbox" id="vs-computer-checkbox"> Play vs Computer</label>
+    </div>
+    <div class="menu-row" id="computer-color-row">
+      <label>Play as</label>
+      <div class="menu-radio-group">
+        <label><input type="radio" name="human-color" value="white" id="human-color-white" checked> White</label>
+        <label><input type="radio" name="human-color" value="black" id="human-color-black"> Black</label>
+      </div>
+    </div>
+    <button id="start-game-btn" class="flip-btn menu-start-btn" type="button">Start Game</button>
+  </div>
+</div>
+
+<footer id="footer-note">
+  McCooey's Hexagonal Chess. Click a piece, then a highlighted cell to move.
+</footer>
+
+<footer id="about-note">
+  <strong>About Hex Chess</strong> — Hexagonal chess is a family of chess
+  variants played on boards of hexagonal cells rather than the traditional
+  8×8 grid, each with its own board shape, starting array, and rulesets.
+  Learn the rules and read more about its history on
+  <a href="https://en.wikipedia.org/wiki/Hexagonal_chess" target="_blank" rel="noopener">Wikipedia</a>.
+</footer>
+
+<footer id="credits-note">
+  Piece artwork: the Merida piece set by Armando Hernández Marroquín,
+  used under the
+  <a href="https://www.gnu.org/licenses/gpl-2.0.txt" target="_blank" rel="noopener">GNU GPL v2 (or later)</a>,
+  via the
+  <a href="https://github.com/lichess-org/lila/blob/master/COPYING.md" target="_blank" rel="noopener">lichess.org / lila project</a>.
+</footer>
+
+<script>
+// ---------------------------------------------------------------
+// 0. PERSISTENCE
+//    This file runs as a real standalone HTML page saved to disk
+//    (not a sandboxed Claude.ai artifact preview), so plain
+//    localStorage works fine here. Two separate things are saved:
+//    lightweight PREFERENCES (variant/theme/auto-flip, restored
+//    before the very first game starts) and the actual
+//    IN-PROGRESS GAME (board position, turn, history -- restored
+//    instead of a fresh start if present). Undo history deliberately
+//    does NOT persist -- see initGame() for why.
+//    Wrapped in try/catch throughout: localStorage can throw (private
+//    browsing in some browsers, storage disabled, quota issues), and
+//    none of that should ever be able to break the game itself --
+//    worst case, preferences/progress just silently don't restore.
+// ---------------------------------------------------------------
+
+const STORAGE_PREFS_KEY = 'hexchess:prefs:v1';
+const STORAGE_GAME_KEY = 'hexchess:game:v1';
+
+function savePrefs() {
+  try {
+    localStorage.setItem(STORAGE_PREFS_KEY, JSON.stringify({
+      variantId: ACTIVE_VARIANT.id,
+      themeId: document.documentElement.dataset.theme,
+      autoFlip,
+      vsComputer,
+      computerColor,
+    }));
+  } catch (e) { /* ignore -- see note above */ }
+}
+
+function loadPrefs() {
+  try {
+    const raw = localStorage.getItem(STORAGE_PREFS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+function saveGameState() {
+  try {
+    // When auto-flip is on, the board's actual flip is intentionally
+    // DELAYED (see the 350ms setTimeout after a move) so the move
+    // itself is visible before the board turns. Saving the live
+    // `flipped` variable directly would occasionally catch it mid-
+    // delay -- still reflecting the PREVIOUS turn's orientation --
+    // and restore the game facing the wrong way. Save the orientation
+    // the board is actually SETTLING toward instead (desiredFlipState
+    // -- same logic auto-flip itself uses, so this also correctly
+    // saves "always facing White" when playing the computer, not
+    // whoever's turn it happens to be). With auto-flip off, there's
+    // no pending correction to worry about, so the live value is
+    // already correct (whatever the player last set manually).
+    const flippedToSave = autoFlip ? desiredFlipState() : flipped;
+    localStorage.setItem(STORAGE_GAME_KEY, JSON.stringify({
+      variantId: ACTIVE_VARIANT.id,
+      boardState: [...boardState.entries()],
+      turn,
+      moveHistory,
+      capturedByWhite,
+      capturedByBlack,
+      enPassantTargets,
+      flipped: flippedToSave,
+      gameOver,
+      gameOverMessage,
+    }));
+  } catch (e) { /* ignore -- see note above */ }
+}
+
+function loadGameState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_GAME_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    // Defensive: a variant id from an older/different version of this
+    // file wouldn't exist in the current VARIANTS config -- fall back
+    // to a fresh game rather than risk restoring into an unknown shape.
+    if (!data.variantId || !VARIANTS[data.variantId]) return null;
+    return data;
+  } catch (e) { return null; }
+}
+
+// ---------------------------------------------------------------
+// 1. BOARD MODEL
+//    Config-driven so a different board shape / size could be
+//    swapped in later without touching the rendering code.
+// ---------------------------------------------------------------
+
+const BOARD_CONFIG = {
+  hexSize: 26, // pixel radius of each hexagon (center to corner) -- purely a rendering constant
+};
+
+// Standard hex-chess file letters skip "j" to avoid confusion with "i" / "1".
+const FILE_LETTERS = ['a','b','c','d','e','f','g','h','i','k','l'];
+
+// Generate every (q, r, s) cell inside a hexagonal region. `bounds`
+// is {qMin,qMax,rMin,rMax,sMin,sMax} -- a symmetric board (McCooey's,
+// Gliński's) just sets all six to +/-radius; Shafran's asymmetric
+// board needs genuinely different bounds per axis (derived by
+// walking its actual boundary edges -- see project notes). This is
+// the one piece of math that defines the whole board shape.
+function generateBoardCells(bounds) {
+  const cells = [];
+  for (let q = bounds.qMin; q <= bounds.qMax; q++) {
+    for (let r = bounds.rMin; r <= bounds.rMax; r++) {
+      const s = -q - r;
+      if (s >= bounds.sMin && s <= bounds.sMax) cells.push({ q, r, s });
+    }
+  }
+  return cells;
+}
+
+// Symmetric hexagon of the given radius, expressed as bounds.
+function symmetricBounds(radius) {
+  return { qMin: -radius, qMax: radius, rMin: -radius, rMax: radius, sMin: -radius, sMax: radius };
+}
+
+// Resolves a variant's board shape to bounds, however it's specified.
+function getBoardBounds(variant) {
+  return variant.boardBounds || symmetricBounds(variant.boardRadius);
+}
+
+// Hex chess boards use THREE colors (not two) because of how the
+// three "move directions" interact. Derived purely from coordinates
+// so it's automatically consistent for any board size.
+function cellColor(q, r) {
+  const m = ((q - r) % 3 + 3) % 3; // proper modulo, handles negatives
+  return ['light', 'mid', 'dark'][m];
+}
+
+// Axial -> pixel, flat-top hexagon orientation (so files run in
+// vertical columns, matching how hex chess boards are drawn).
+function axialToPixel(q, r, size) {
+  const x = size * 1.5 * q;
+  const y = size * Math.sqrt(3) * (r + q / 2);
+  return { x, y };
+}
+
+function hexCorner(cx, cy, size, i) {
+  const angleDeg = 60 * i; // flat-top: no angular offset
+  const angleRad = Math.PI / 180 * angleDeg;
+  return [cx + size * Math.cos(angleRad), cy + size * Math.sin(angleRad)];
+}
+
+function hexPointsAttr(cx, cy, size) {
+  const pts = [];
+  for (let i = 0; i < 6; i++) pts.push(hexCorner(cx, cy, size, i));
+  return pts.map(p => p.join(',')).join(' ');
+}
+
+// ---------------------------------------------------------------
+// 2. LABELS (file letter + rank number per cell)
+//    Two conventions in use: 'perFileBottomUp' numbers ranks 1..N
+//    from the bottom of each individual file (McCooey's, Gliński's --
+//    every file starts at rank 1). Shafran's board instead has rank
+//    as a direct linear function of one axial coordinate (verified
+//    against the board's own known corner squares), which is what
+//    produces its distinctive "staircase" -- files don't all start
+//    at rank 1, e.g. the i-file spans ranks 5-10, never reaching 1.
+// ---------------------------------------------------------------
+
+function assignLabels(cells, variant) {
+  const bounds = getBoardBounds(variant);
+  if (variant.rankMode === 'linearR') {
+    cells.forEach(c => {
+      c.file = FILE_LETTERS[c.q - bounds.qMin];
+      c.rank = variant.rankOffset - c.r;
+      c.label = `${c.file}${c.rank}`;
+    });
+    return;
+  }
+  const byFile = {};
+  cells.forEach(c => {
+    (byFile[c.q] = byFile[c.q] || []).push(c);
+  });
+  Object.values(byFile).forEach(fileCells => {
+    // sort bottom-to-top in screen space => rank 1 at the bottom
+    fileCells.sort((a, b) => {
+      const pa = axialToPixel(a.q, a.r, BOARD_CONFIG.hexSize);
+      const pb = axialToPixel(b.q, b.r, BOARD_CONFIG.hexSize);
+      return pb.y - pa.y;
+    });
+    fileCells.forEach((c, i) => { c.rank = i + 1; });
+  });
+  cells.forEach(c => {
+    c.file = FILE_LETTERS[c.q - bounds.qMin];
+    c.label = `${c.file}${c.rank}`;
+  });
+}
+
+// ---------------------------------------------------------------
+// 2b. VARIANTS
+//     Everything that actually differs between hex chess rulesets,
+//     collected in one place. Per the rules research: rook, bishop,
+//     queen, knight, and king movement, the board shape, and the
+//     3-colouring are IDENTICAL across McCooey's and Gliński's --
+//     only these fields vary. Adding a new variant is just adding
+//     a new entry here; nothing in the engine below needs to change.
+// ---------------------------------------------------------------
+
+// One glyph shape per piece type, shared by both sides -- colour
+// alone distinguishes white from black (via .piece.white/.piece.black
+// CSS below). Deliberately NOT mixing Unicode's "white" (thin outline)
+// and "black" (solid silhouette) glyph sets: those differ in filled
+// area as much as shape, so applying arbitrary theme fill colours to
+// each made black pieces show far more of their light fill colour
+// than white pieces showed of their dark one -- a real legibility
+// bug, not just a colour choice. The solid set alone also reads
+// more cleanly at small board sizes than the thin outline set.
+const PIECE_GLYPH = {
+  K: '\u265A', Q: '\u265B', R: '\u265C', B: '\u265D', N: '\u265E', P: '\u265F',
+};
+
+const PIECE_NAME = {
+  K: 'King', Q: 'Queen', R: 'Rook', B: 'Bishop', N: 'Knight', P: 'Pawn',
+};
+
+// Real open-source piece artwork (Merida set, by Armando Hernandez
+// Marroquin, GPLv2+, as used by Lichess and PyChess -- see
+// https://github.com/lichess-org/lila/tree/master/public/piece/merida).
+// Each entry is the INNER markup of the original 0-0-50-50-viewBox
+// SVG file, kept exactly as authored (colours included -- these
+// stay plain black/white regardless of app theme, deliberately not
+// re-themed, per current request). Internal gradient ids are
+// de-duplicated per rendered instance in renderPieces() below, since
+// the same markup is reused for every piece of that type/colour on
+// the board.
+const PIECE_ART_MERIDA = {
+  white: {
+    K: "<linearGradient id=\"a\" x1=\"21.376\" x2=\"77.641\" y1=\"37.346\" y2=\"37.346\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#fff\"/><stop offset=\"1\" stop-color=\"#fff\" stop-opacity=\"0\"/></linearGradient><path fill=\"#1f1a17\" d=\"M25.821 12.022h-1.76v-3.25h-2.067c-.558 0-.838-.272-.838-.822v-.025c0-.542.28-.813.838-.813h2.066V5.004c0-.585.297-.872.89-.872.575 0 .871.287.871.872v2.108h2.134c.542 0 .813.27.813.813v.025c0 .55-.271.821-.813.821l-2.117.026zM11.03 37.744l-.813-4.64c-.017 0-.042-.033-.076-.101-.085-.119-.322-.271-.711-.457-.381-.195-.838-.517-1.346-.982a41.99 41.99 0 0 1-1.702-1.49 8.509 8.509 0 0 1-1.1-1.237C4.273 27.45 3.705 25.772 3.595 23.8c-.17-1.897.601-3.794 2.303-5.682 1.719-1.88 4.047-2.768 6.968-2.65 1.092.068 2.38.33 3.844.796.483.195.974.39 1.482.576l1.498.584c.263.136.5.271.695.398a4.38 4.38 0 0 1-.127-1.041c0-1.287.457-2.388 1.38-3.302.914-.906 2.023-1.372 3.31-1.389 1.287 0 2.388.466 3.302 1.38.906.915 1.363 2.015 1.363 3.285 0 .263-.034.61-.101 1.042.228-.144.457-.271.669-.373.762-.33 1.76-.72 3.005-1.16 1.423-.482 2.701-.753 3.844-.821 2.921-.136 5.241.753 6.943 2.65 1.668 1.888 2.447 3.785 2.328 5.681-.127 1.973-.703 3.65-1.71 5.038-.33.449-.703.863-1.118 1.253a40.5 40.5 0 0 1-1.66 1.473c-.541.466-1.007.796-1.388.982-.38.186-.6.347-.669.457a.294.294 0 0 1-.05.077c-.017.017-.026.034-.026.05l-.796 4.666 1.643 6.121c-.83.745-2.684 1.355-5.554 1.837-2.879.483-6.206.72-9.974.72-3.835 0-7.214-.254-10.118-.754-2.912-.508-4.741-1.143-5.486-1.896z\"/><path fill=\"url(#a)\" d=\"M25.796 29.532c2.845.033 5.444.203 7.806.508 2.37.304 4.225.694 5.563 1.151a126.32 126.32 0 0 0 2.057-1.651 12.018 12.018 0 0 0 1.863-1.846c.787-1.007 1.185-2.337 1.185-3.996 0-1.482-.356-2.726-1.067-3.717-1.27-1.854-3.209-2.777-5.8-2.777-1.557 0-3.149.322-4.792.965-1.439.584-2.531 1.228-3.268 1.94-1.388 1.388-2.421 3.174-3.082 5.35-.228.779-.364 1.49-.406 2.125s-.06 1.287-.06 1.947zm-13.25 6.697c3.14-.796 7.306-1.194 12.505-1.194 5.088 0 9.203.38 12.327 1.143l.618-3.65c-3.327-.871-7.67-1.312-13.047-1.312-5.41 0-9.745.45-13.022 1.338zm25.298 4.41-.737-2.844c-3.276-.728-7.332-1.092-12.158-1.092-4.809 0-8.856.364-12.133 1.092l-.787 2.87c3.158-.923 7.468-1.388 12.946-1.388 5.444 0 9.728.457 12.869 1.363zm.652 2.338c-3.192-1.287-7.68-1.94-13.445-1.94-5.986 0-10.516.661-13.598 1.99 2.913 1.152 7.417 1.736 13.522 1.736 2.912 0 5.562-.16 7.958-.483 2.405-.321 4.25-.762 5.563-1.303M24.077 29.532c-.008-.644-.034-1.287-.068-1.922s-.16-1.347-.372-2.126c-.677-2.21-1.702-3.996-3.082-5.35-.711-.695-1.795-1.347-3.268-1.94-1.685-.66-3.285-.99-4.792-.99-2.608 0-4.547.931-5.8 2.803-.711.99-1.067 2.235-1.067 3.716 0 1.626.398 2.955 1.186 3.997.482.61 1.092 1.227 1.837 1.837s1.44 1.168 2.083 1.66c2.895-1.042 7.34-1.6 13.343-1.685m.872-4.615c.119-.465.212-.787.296-.965.17-.643.356-1.194.576-1.643.093-.279.237-.6.432-.973.186-.373.39-.805.61-1.279.127-.28.27-.626.415-1.033.152-.406.304-.804.448-1.202.136-.33.203-.686.203-1.067 0-.813-.296-1.498-.872-2.066-.575-.575-1.278-.863-2.108-.863-1.964 0-2.955.99-2.955 2.955 0 .38.068.736.203 1.067.365 1.075.644 1.82.839 2.235.22.474.415.906.6 1.278.179.373.34.694.466.974.22.55.398 1.092.55 1.642.035.094.128.415.297.94\"/>",
+    Q: "<linearGradient id=\"a\" x1=\"21.253\" x2=\"77.641\" y1=\"37.224\" y2=\"37.346\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#fff\"/><stop offset=\"1\" stop-color=\"#fff\" stop-opacity=\"0\"/></linearGradient><path fill=\"#1f1a17\" stroke=\"#1f1a17\" stroke-width=\".076\" d=\"M44.541 14.723c-.94 0-1.744-.33-2.404-.982s-.991-1.448-.991-2.396q0-1.3845.99-2.388c.66-.677 1.465-1.007 2.405-1.007.931 0 1.727.33 2.388 1.007.66.67.99 1.465.99 2.388 0 .948-.33 1.744-.99 2.396a3.28 3.28 0 0 1-2.388.982zm-4.31 29.219c-.812.71-2.633 1.304-5.46 1.786-2.828.474-6.088.72-9.771.72-3.75 0-7.053-.254-9.898-.745-2.844-.5-4.64-1.118-5.384-1.863l1.566-5.952-.694-3.895L8.405 30.2 6.297 14.774l1.21-.474 6.8 11.455.152-13.64 1.685-.296 5.182 13.716 2.776-14.757h1.72l2.776 14.706L33.73 11.82l1.71.296.153 13.64 6.824-11.48 1.16.541-2.058 15.359-2.21 3.793-.694 3.945zM14.535 11.988c-.948 0-1.752-.321-2.413-.973-.66-.652-.99-1.456-.99-2.396 0-.923.33-1.719.99-2.38s1.465-.99 2.413-.99c.923 0 1.719.33 2.38.99s.99 1.457.99 2.38c0 .94-.33 1.744-.99 2.396a3.266 3.266 0 0 1-2.38.973zM5.4 14.723c-.94 0-1.736-.33-2.388-.982s-.982-1.448-.982-2.396c0-.923.33-1.719.982-2.388C3.664 8.28 4.46 7.95 5.4 7.95c.948 0 1.744.33 2.413 1.007.66.67.99 1.465.99 2.388 0 .948-.33 1.744-.99 2.396a3.323 3.323 0 0 1-2.413.982zm19.55-3.97c-.94 0-1.745-.33-2.397-.991-.652-.66-.974-1.465-.974-2.405 0-.931.322-1.727.974-2.387s1.456-.99 2.396-.99c.923 0 1.727.33 2.396.99a3.23 3.23 0 0 1 1 2.387c0 .94-.33 1.744-1 2.405-.669.66-1.473.99-2.396.99zm10.413 1.235c-.94 0-1.736-.321-2.387-.973-.652-.652-.983-1.456-.983-2.396 0-.923.33-1.719.983-2.38s1.447-.99 2.387-.99c.948 0 1.753.33 2.413.99s.99 1.457.99 2.38c0 .94-.33 1.744-.99 2.396s-1.465.973-2.413.973z\"/><path fill=\"url(#a)\" stroke=\"#1f1a17\" stroke-width=\".076\" d=\"M38.217 43.044c-3.023-1.253-7.417-1.88-13.166-1.88-5.876 0-10.313.644-13.327 1.931 2.896 1.143 7.316 1.71 13.25 1.71 2.845 0 5.445-.152 7.798-.465 2.363-.314 4.175-.745 5.445-1.296zM24.949 9.017c1.11 0 1.66-.56 1.66-1.66 0-1.092-.55-1.642-1.66-1.642-1.092 0-1.634.55-1.634 1.642 0 1.1.542 1.66 1.634 1.66zm12.624 24.976c-3.192-.812-7.366-1.21-12.522-1.21-5.292 0-9.517.406-12.675 1.236l.373 2.379c3.217-.762 7.323-1.143 12.302-1.143 4.944 0 8.975.372 12.099 1.117zm.618-1.49 1.617-2.853a6.432 6.432 0 0 1-2.43.474c-2.218 0-3.987-.897-5.308-2.7-.99.82-2.1 1.235-3.328 1.235-1.583 0-2.853-.618-3.793-1.862-1.058 1.16-2.32 1.744-3.793 1.744-1.194 0-2.286-.406-3.276-1.22-1.389 1.77-3.184 2.65-5.385 2.65a7.055 7.055 0 0 1-2.506-.465l1.735 2.972c3.21-.923 7.62-1.389 13.225-1.389 5.707 0 10.118.474 13.242 1.414zm-11.108-5.926-2.108-12.133-2.109 11.989c.051-.034.161-.119.348-.254.38-.745.956-1.118 1.735-1.118.847 0 1.389.373 1.634 1.118.102.101.271.237.5.398zm6.866.474V15.56l-4.09 11.261c.314-.11.577-.262.797-.44.33-.415.779-.627 1.338-.627.66 0 1.193.297 1.591.872.043.068.102.136.17.212.067.076.135.144.194.212zm-13.936-.347L15.95 15.562v11.336c.043-.067.119-.144.22-.245.33-.694.872-1.042 1.634-1.042.627 0 1.143.263 1.541.796.449.195.67.297.67.297zm-6.3 1.388L8.38 18.89l1.363 8.382c.94.66 1.863.99 2.752.99.347 0 .753-.059 1.219-.169zm22.395.119c.381.118.805.178 1.27.178 1.008 0 1.948-.314 2.828-.94l1.363-8.585zm1.49 12.556-.745-2.803c-3.242-.71-7.205-1.066-11.904-1.066-4.648 0-8.61.355-11.878 1.066l-.771 2.828c3.073-.931 7.298-1.388 12.675-1.388 5.24 0 9.448.448 12.623 1.363zM14.535 10.253c1.084 0 1.634-.542 1.634-1.634s-.55-1.634-1.634-1.634c-1.109 0-1.668.542-1.668 1.634s.56 1.634 1.668 1.634zm20.828 0c1.11 0 1.668-.542 1.668-1.634s-.559-1.634-1.668-1.634c-1.083 0-1.634.542-1.634 1.634s.55 1.634 1.634 1.634zM5.4 12.988c1.109 0 1.668-.55 1.668-1.643 0-1.11-.56-1.66-1.668-1.66-1.084 0-1.634.55-1.634 1.66 0 1.092.55 1.643 1.634 1.643zm39.141 0c1.092 0 1.643-.55 1.643-1.643 0-1.11-.55-1.66-1.643-1.66-1.1 0-1.66.55-1.66 1.66 0 1.092.56 1.643 1.66 1.643z\"/>",
+    R: "<linearGradient id=\"a\" x1=\"21.376\" x2=\"77.641\" y1=\"37.469\" y2=\"37.469\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#fff\"/><stop offset=\"1\" stop-color=\"#fff\" stop-opacity=\"0\"/></linearGradient><path fill=\"#1f1a17\" d=\"M28.408 9.22h4.216V5.825h6.799v9.296l-5.503 4.242v11.862l4.216 4.216v5.08h3.793v5.927H8.071V40.52h3.793v-5.08l4.242-4.216V19.363l-5.504-4.242V5.825h6.774V9.22h4.242V5.825h6.79z\"/><path fill=\"url(#a)\" d=\"m33.073 17.678 3.15-2.557h-22.42l3.175 2.557zm7.197 24.528H9.756v2.557H40.27zm-3.844-5.055H13.6v3.37h22.826zm-4.217-17.788H17.816v11.862h14.393zm5.504-5.927V7.51h-3.395v3.395h-7.646V7.51h-3.344v3.395h-7.62V7.51h-3.395v5.926zm-1.914 22.005-2.548-2.531H16.8l-2.6 2.531z\"/>",
+    B: "<linearGradient id=\"a\" x1=\"21.13\" x2=\"77.641\" y1=\"37.592\" y2=\"37.469\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#fff\"/><stop offset=\"1\" stop-color=\"#fff\" stop-opacity=\"0\"/></linearGradient><path fill=\"#1f1a17\" d=\"M25.447 42.008c-.228.94-.516 1.592-.846 1.956s-.762.745-1.313 1.143c-.592.415-1.295.762-2.108 1.05s-1.71.364-2.7.211l-6.969-.965a2.858 2.858 0 0 0-.762 0c-.22.034-.432.051-.635.051-.347 0-.787.076-1.32.237-.542.152-.957.381-1.254.677l-2.404-3.945c.296-.33.559-.559.787-.694.237-.127.508-.271.821-.415a9.179 9.179 0 0 1 3.074-.822c.466-.033.923-.042 1.363-.025a9.8 9.8 0 0 0 1.397-.05c.89.152 1.786.287 2.684.406.906.127 1.812.254 2.718.39.99 0 1.66-.102 2.006-.297.187-.102.474-.288.872-.55.398-.263.796-.652 1.194-1.169-.88-.093-1.77-.262-2.684-.508a24.094 24.094 0 0 1-2.404-.753l2.582-6.401c-1.295-.745-2.193-1.338-2.71-1.795a5.3 5.3 0 0 1-1.21-1.575c-.432-.762-.711-1.499-.83-2.21a9.341 9.341 0 0 1-.16-1.913c.016-.99.245-2.083.702-3.285.457-1.194 1.312-2.27 2.566-3.21a79.091 79.091 0 0 0 3.056-2.455 27.746 27.746 0 0 0 2.946-2.954c-1.219-.627-1.828-1.626-1.828-2.998 0-.93.321-1.718.973-2.387.652-.66 1.457-.99 2.396-.99.923 0 1.72.33 2.38.99.66.669.99 1.456.99 2.387 0 1.355-.61 2.354-1.829 2.998a26.796 26.796 0 0 0 2.913 2.954c.982.839 2.015 1.66 3.09 2.456 1.236.94 2.083 2.015 2.523 3.209.449 1.202.694 2.294.72 3.285 0 .567-.05 1.202-.17 1.913s-.38 1.448-.795 2.21a6.084 6.084 0 0 1-1.253 1.575c-.5.457-1.389 1.05-2.667 1.795l2.582 6.4a28.57 28.57 0 0 1-2.455.754c-.915.246-1.787.415-2.634.508.381.517.771.906 1.169 1.168.398.263.694.45.897.55.347.196 1.016.297 2.007.297a263.35 263.35 0 0 1 2.692-.39 81.13 81.13 0 0 0 2.718-.406c.44.051.89.068 1.346.051a13.12 13.12 0 0 1 1.406.025 9.627 9.627 0 0 1 3.073.822c.297.144.567.288.805.415.245.135.508.364.804.694l-2.43 3.945c-.296-.296-.711-.525-1.253-.677-.534-.16-.965-.237-1.296-.237-.22 0-.44-.017-.66-.05a2.794 2.794 0 0 0-.753 0l-6.952.964c-.99.153-1.913.085-2.76-.194-.855-.28-1.558-.652-2.1-1.118a20.04 20.04 0 0 1-1.303-1.151c-.322-.322-.593-.957-.805-1.897\"/><path fill=\"url(#a)\" d=\"M26.32 39.197c0 1.092.245 2.024.753 2.794.5.77 1.041 1.372 1.626 1.795.905.669 2.235 1 3.987 1 .432 0 1.279-.094 2.532-.28a74.737 74.737 0 0 1 2.48-.356c.627-.076 1.05-.135 1.27-.186a6.53 6.53 0 0 1 1.982.05c.262.068.559.128.88.187a1.6 1.6 0 0 1 .805.38l1.194-1.93a7.372 7.372 0 0 0-2.16-.72c-1.252-.22-2.353-.262-3.301-.151-.28.033-.644.118-1.101.245-.457.136-1.067.263-1.846.372-1.676.272-2.557.399-2.658.399-.644 0-1.203-.077-1.685-.246a10.37 10.37 0 0 1-1.287-.542c-.88-.398-1.77-1.338-2.684-2.81zm-1.762 0h-.795c-.932 1.49-1.812 2.43-2.659 2.811-.398.195-.83.373-1.312.542-.483.17-1.033.246-1.66.246-.118 0-.999-.127-2.658-.398-.788-.11-1.423-.238-1.88-.373a8.828 8.828 0 0 0-1.092-.245c-.948-.11-2.04-.068-3.302.152a7.056 7.056 0 0 0-2.134.72l1.194 1.93c.195-.195.457-.322.779-.381.322-.06.618-.119.88-.186a6.53 6.53 0 0 1 1.982-.051c.22.05.643.11 1.27.186.626.076 1.465.195 2.506.356 1.236.186 2.083.28 2.531.28 1.736 0 3.065-.331 3.988-1 .567-.423 1.1-1.024 1.6-1.795.508-.77.762-1.702.762-2.794m.89-9.347c1.6 0 3.14.127 4.614.372 1.617-.575 2.794-1.481 3.522-2.7a6.745 6.745 0 0 0 .94-3.497c0-.762-.187-1.6-.568-2.523-.38-.915-.999-1.744-1.862-2.49-.974-.812-2.04-1.701-3.2-2.666a33.093 33.093 0 0 1-3.447-3.387c-1.16 1.287-2.311 2.421-3.47 3.387a406.55 406.55 0 0 0-3.176 2.667c-.88.745-1.499 1.574-1.871 2.489-.373.923-.559 1.76-.559 2.523 0 1.27.305 2.438.914 3.497.712 1.219 1.897 2.125 3.548 2.7a27.749 27.749 0 0 1 4.614-.372zm0 4.513c1.938 0 3.793.194 5.579.575l-1.185-3.056a28.297 28.297 0 0 0-4.395-.347c-1.507 0-2.98.118-4.41.347l-1.194 3.056c1.769-.38 3.64-.575 5.604-.575zm0-23.538c1.126 0 1.684-.559 1.684-1.685s-.559-1.693-1.685-1.693-1.684.567-1.684 1.693.558 1.685 1.684 1.685zm0 27.009a18.97 18.97 0 0 0 3.285-.28c1.066-.194 2.1-.423 3.09-.685-1.94-.508-4.064-.77-6.376-.77-2.345 0-4.47.262-6.375.77.957.262 1.973.49 3.048.686a19.46 19.46 0 0 0 3.327.279zm-.89-14.334-2.065-.026c-.56 0-.839-.279-.839-.846 0-.559.28-.838.839-.838h2.065v-2.134c0-.576.297-.872.89-.872.575 0 .872.296.872.872v2.134h2.133c.542 0 .813.28.813.838 0 .567-.271.846-.813.846H26.32v2.032c0 .602-.297.898-.873.898-.592 0-.889-.296-.889-.898z\"/>",
+    N: "<linearGradient id=\"a\" x1=\"21.405\" x2=\"77.641\" y1=\"37.346\" y2=\"37.346\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#fff\"/><stop offset=\"1\" stop-color=\"#fff\" stop-opacity=\"0\"/></linearGradient><path fill=\"#1f1a17\" d=\"M26.178 9.395c2.6.17 5.004.838 7.222 2.015 2.21 1.169 4.098 2.676 5.656 4.513 1.092 1.287 2.117 2.845 3.082 4.665a28.684 28.684 0 0 1 2.32 5.774 36.511 36.511 0 0 1 1.253 7.46c.177 2.599.262 5.012.262 7.23v5.402H15.468c-.153 0-.22-.407-.212-1.21.009-.814.06-1.466.16-1.965.06-.398.221-.957.467-1.685.254-.728.66-1.609 1.244-2.65.263-.534.89-1.304 1.88-2.32.999-1.016 2.133-2.201 3.429-3.539.745-.762 1.32-1.719 1.744-2.879.423-1.151.601-2.201.533-3.15a8.37 8.37 0 0 1-2.006 1.22c-3.505 1.253-6.045 3.073-7.612 5.452-.118.153-.49.822-1.117 2.015-.33.627-.618 1.059-.847 1.287-.313.314-.77.491-1.363.525-.923.043-1.643-.398-2.16-1.346-.693.203-1.312.288-1.862.254-.923-.347-1.592-.72-2.006-1.117-.847-.847-1.389-1.685-1.651-2.532a9.43 9.43 0 0 1-.381-2.726c0-1.389.855-3.226 2.582-5.512 2.015-2.625 3.09-4.631 3.217-6.003 0-.593.06-1.261.178-2.007a4.198 4.198 0 0 1 .618-1.49c.22-.33.364-.558.432-.677.076-.127.212-.313.415-.559.144-.203.27-.355.372-.457.093-.11.22-.254.373-.44.178-.212.406-.457.694-.745a18.06 18.06 0 0 1-1.067-7.46c3.285 1.169 6.054 3.015 8.28 5.53.551-1.872 1.626-3.387 3.226-4.539 1.321.923 2.371 2.15 3.15 3.666\"/><path fill=\"url(#a)\" d=\"M42.976 44.693c-.017 0 0-.449.042-1.346.051-.906.076-1.88.076-2.921.017-2.066.017-4.2 0-6.41a26.837 26.837 0 0 0-.889-6.612c-.567-2.117-1.185-3.92-1.862-5.419-.678-1.498-1.414-2.785-2.21-3.878-1.185-1.786-2.811-3.302-4.86-4.538-2.049-1.244-4.19-2.057-6.426-2.438.152.813.22 1.609.203 2.387-.034.593-.313.89-.847.89-.61 0-.88-.297-.82-.89.05-2.184-.729-4.055-2.33-5.604-1.252 1.32-1.938 2.853-2.031 4.605-.034.585-.33.839-.898.77-.525-.016-.787-.32-.787-.914 0 0 .017-.067.042-.203-.677.22-1.388.525-2.133.923-.474.33-.864.246-1.16-.245-.297-.5-.17-.89.398-1.169.71-.364 1.244-.635 1.608-.821a17.634 17.634 0 0 0-4.86-3.522 17.31 17.31 0 0 0 1.889 6.528c.279.423.211.804-.204 1.134-.465.364-.855.313-1.168-.17a8.87 8.87 0 0 1-.491-.897c-.347.347-.584.61-.694.77-.119.153-.322.483-.61.991-.288.517-.5.94-.635 1.27-.144.415-.212.745-.186 1.008.025.254.05.533.067.855a7.61 7.61 0 0 1-1.007 2.752 133.71 133.71 0 0 1-1.998 3.15 127.607 127.607 0 0 1-1.787 2.675c-.415.601-.728 1.354-.94 2.286-.152.559-.152 1.244 0 2.04.144.805.475 1.431.966 1.88.762.77 1.498 1.126 2.21 1.067.228 0 .541-.093.93-.28.39-.178.687-.525.907-1.041.423-.94.779-1.414 1.067-1.414.406 0 .635.237.668.694 0 .102-.135.517-.397 1.245-.153.33-.348.677-.593 1.041-.322.432-.457.61-.423.542.262.948.702 1.11 1.312.5.178-.178.39-.525.618-1.016q.3555-.75 1.092-2.007c.584-.982 1.202-1.77 1.863-2.388.66-.61 1.244-1.109 1.76-1.481.297-.22.661-.466 1.093-.745.432-.288 1.008-.576 1.736-.872.576-.229 1.219-.517 1.922-.856s1.329-.77 1.87-1.303c.763-.745 1.347-1.66 1.762-2.752.22-.61.296-1.363.245-2.26-.144-.56.136-.839.847-.839.533 0 .83.271.898.821 0 1.863-.534 3.565-1.592 5.106.347 1.058.44 2.218.27 3.471-.143 1.008-.499 2.091-1.05 3.243-.558 1.143-1.676 2.421-3.36 3.827-3.43 2.845-5.046 5.774-4.86 8.78h12.175zM9.338 29.613c-.483.297-.77.695-.872 1.194.017.542-.237.839-.762.89-.584.067-.88-.178-.898-.746.068-1.092.55-1.955 1.465-2.599.432-.347.83-.322 1.194.093.364.449.322.838-.127 1.169zm7.366-11.827c.212.33.296.677.245 1.041-.16 1.058-.753 1.499-1.76 1.338a1.596 1.596 0 0 1-.72-.296c-.06.076-.161.262-.297.541-.178.534-.525.712-1.041.55-.508-.202-.711-.575-.593-1.117.745-1.905 2.091-3.209 4.039-3.92.567-.17.94 0 1.117.491.204.534.051.898-.448 1.092a2.745 2.745 0 0 1-.271.136c-.085.042-.17.093-.271.144\"/>",
+    P: "<linearGradient id=\"a\" x1=\"21.13\" x2=\"77.764\" y1=\"37.346\" y2=\"37.469\" gradientTransform=\"matrix(1 0 0 .97324 0 1.243)\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#fff\"/><stop offset=\"1\" stop-color=\"#fff\" stop-opacity=\"0\"/></linearGradient><path fill=\"#1f1a17\" d=\"M25 46.448H11.606a13.139 13.139 0 0 1-.99-5.043c0-2.975.863-5.644 2.598-8.018 1.736-2.365 3.971-4.054 6.697-5.067a6.824 6.824 0 0 1-2.861-2.398c-.737-1.071-1.1-2.283-1.1-3.634 0-1.69.575-3.156 1.735-4.392 1.151-1.244 2.574-1.961 4.267-2.15-1.346-.981-2.015-2.283-2.015-3.89 0-1.351.491-2.513 1.482-3.477.982-.964 2.176-1.442 3.581-1.442 1.389 0 2.582.478 3.573 1.442.99.964 1.49 2.126 1.49 3.477 0 1.607-.669 2.909-2.015 3.89 1.693.189 3.116.906 4.267 2.15 1.16 1.236 1.736 2.703 1.736 4.392 0 1.351-.373 2.563-1.126 3.634a7.036 7.036 0 0 1-2.862 2.398c2.726 1.013 4.962 2.702 6.697 5.067 1.736 2.374 2.6 5.043 2.6 8.018q0 2.6085-.966 5.043z\"/><path fill=\"url(#a)\" d=\"M25 44.808h12.175a11.79 11.79 0 0 0 .525-3.403c0-2.513-.711-4.787-2.142-6.831-1.43-2.044-3.277-3.552-5.52-4.516-1.584-.62-1.643-.659-1.643-1.738 0-.849.559-1.475 1.668-1.879 1.533-1.046 2.303-2.43 2.303-4.153 0-1.244-.432-2.324-1.287-3.263-.864-.931-1.905-1.467-3.124-1.615-1-.083-1.49-.626-1.49-1.64 0-.453.178-.873.542-1.26.897-.676 1.346-1.558 1.346-2.654 0-.898-.339-1.673-1-2.315-.66-.643-1.447-.964-2.353-.964-.94 0-1.744.32-2.396.964a3.136 3.136 0 0 0-.974 2.315c0 1.08.44 1.961 1.338 2.653.364.355.542.775.542 1.261 0 1.014-.483 1.557-1.465 1.64a4.9 4.9 0 0 0-3.133 1.615c-.855.94-1.278 2.019-1.278 3.263 0 1.722.77 3.107 2.303 4.153 1.11.412 1.668 1.046 1.668 1.879 0 1.08-.068 1.118-1.668 1.738-2.244.964-4.081 2.472-5.503 4.516-1.423 2.044-2.134 4.318-2.134 6.831 0 1.195.178 2.324.525 3.403z\"/>",
+  },
+  black: {
+    K: "<linearGradient id=\"a\" x1=\"21.13\" x2=\"77.764\" y1=\"37.224\" y2=\"37.469\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#fff\"/><stop offset=\"1\" stop-color=\"#fff\" stop-opacity=\"0\"/></linearGradient><path fill=\"#1f1a17\" d=\"M25.821 12.022h-1.76v-3.25h-2.067c-.558 0-.838-.272-.838-.822v-.025c0-.542.28-.813.838-.813h2.066V5.004c0-.585.297-.872.89-.872.575 0 .871.287.871.872v2.108h2.134c.542 0 .813.27.813.813v.025c0 .55-.271.821-.813.821l-2.117.026zM11.03 37.744l-.813-4.64c-.017 0-.042-.033-.076-.101-.085-.119-.322-.271-.711-.457-.381-.195-.838-.517-1.346-.982a41.99 41.99 0 0 1-1.702-1.49 8.509 8.509 0 0 1-1.1-1.237C4.273 27.45 3.705 25.772 3.595 23.8c-.17-1.897.601-3.794 2.303-5.682 1.719-1.88 4.047-2.768 6.968-2.65 1.092.068 2.38.33 3.844.796.483.195.974.39 1.482.576l1.498.584c.263.136.5.271.695.398a4.38 4.38 0 0 1-.127-1.041c0-1.287.457-2.388 1.38-3.302.914-.906 2.023-1.372 3.31-1.389 1.287 0 2.388.466 3.302 1.38.906.915 1.363 2.015 1.363 3.285 0 .263-.034.61-.101 1.042.228-.144.457-.271.669-.373.762-.33 1.76-.72 3.005-1.16 1.423-.482 2.701-.753 3.844-.821 2.921-.136 5.241.753 6.943 2.65 1.668 1.888 2.447 3.785 2.328 5.681-.127 1.973-.703 3.65-1.71 5.038-.33.449-.703.863-1.118 1.253a40.5 40.5 0 0 1-1.66 1.473c-.541.466-1.007.796-1.388.982-.38.186-.6.347-.669.457a.294.294 0 0 1-.05.077c-.017.017-.026.034-.026.05l-.796 4.666 1.643 6.121c-.83.745-2.684 1.355-5.554 1.837-2.879.483-6.206.72-9.974.72-3.835 0-7.214-.254-10.118-.754-2.912-.508-4.741-1.143-5.486-1.896z\"/><path fill=\"url(#a)\" d=\"M24.95 20.675a2.295 2.295 0 0 0-.128-.423 5.606 5.606 0 0 0-.245-.72c-.051-.11-.119-.254-.195-.431a9.028 9.028 0 0 1-.254-.56c-.05-.118-.11-.27-.186-.456-.068-.195-.136-.373-.187-.534a1.735 1.735 0 0 1-.067-.474c0-.872.415-1.312 1.261-1.312.88 0 1.313.431 1.313 1.287 0 .22-.034.372-.094.474-.237.626-.355.965-.372 1.016-.254.5-.406.821-.474.965-.119.27-.195.508-.22.72-.051.101-.085.186-.102.262s-.034.136-.05.186m-2.778 8.56c-2.066.034-3.954.136-5.673.322-1.71.178-3.03.44-3.979.77a18.973 18.973 0 0 0-1.719-1.854 33.007 33.007 0 0 1-1.727-1.744c-.83-.847-1.236-1.77-1.236-2.777 0-1.245.203-2.15.618-2.726.44-.67 1.135-1.16 2.058-1.482a8.486 8.486 0 0 1 2.802-.483c1.194 0 2.328.263 3.42.796 1.076.56 1.787 1.008 2.134 1.338 1.126 1.143 2.007 2.38 2.633 3.717.212.5.373 1.194.483 2.074.11.89.17 1.567.186 2.05zm2.777-4.318c.119-.466.212-.787.296-.965.17-.643.356-1.194.576-1.643.093-.279.237-.6.432-.973.186-.373.39-.805.61-1.279.127-.28.27-.626.415-1.033.152-.406.304-.804.448-1.202.136-.33.203-.686.203-1.067 0-.813-.296-1.498-.872-2.066-.575-.575-1.278-.863-2.108-.863-1.964 0-2.955.99-2.955 2.955 0 .38.068.736.203 1.066.365 1.076.644 1.82.839 2.236.22.474.415.906.6 1.278.179.373.34.694.466.974.22.55.398 1.092.55 1.642.035.093.128.415.297.94m-.889 6.223c0-.66-.017-1.575-.05-2.735-.034-1.168-.161-2.142-.373-2.92-.677-2.21-1.702-3.997-3.082-5.351-.711-.695-1.795-1.347-3.268-1.94-1.685-.66-3.285-.99-4.792-.99-2.608 0-4.547.931-5.8 2.803-.711.99-1.067 2.235-1.067 3.716 0 1.626.398 2.955 1.186 3.997.415.592 1.21 1.329 2.387 2.21 1.169.872 2.168 1.684 2.972 2.43 1.44-.314 3.065-.585 4.877-.822 1.812-.229 4.149-.364 7.01-.398m13.784 11.735-.737-2.93c-3.225-.736-7.281-1.109-12.158-1.109-4.826 0-8.864.373-12.107 1.11l-.787 2.954c3.14-.956 7.442-1.439 12.92-1.439 2.624 0 5.071.136 7.315.398 2.252.262 4.106.601 5.554 1.016m-.643-7.417c-3.04-.838-7.096-1.261-12.15-1.261-5.097 0-9.195.431-12.302 1.287l.372 2.506c3.125-.813 7.095-1.22 11.93-1.22 4.809 0 8.729.398 11.752 1.194zm-11.363-4.292c2.845.05 5.182.194 7.002.423 1.812.229 3.455.508 4.91.821.907-.897 1.914-1.744 3.023-2.557s1.888-1.507 2.337-2.083c.788-1.075 1.186-2.413 1.186-4.021 0-1.465-.356-2.701-1.067-3.692-1.27-1.87-3.218-2.802-5.825-2.802-1.524 0-3.108.33-4.767.99-1.507.593-2.59 1.237-3.277 1.93-1.405 1.364-2.43 3.15-3.073 5.36-.246.762-.381 1.727-.407 2.904s-.042 2.083-.042 2.727m1.812-1.93c0-.483.06-1.16.16-2.05.111-.88.28-1.575.509-2.074.618-1.338 1.49-2.574 2.633-3.717.33-.33 1.042-.779 2.134-1.338a7.655 7.655 0 0 1 3.446-.796c.93 0 1.845.161 2.768.483.915.322 1.609.813 2.066 1.482.415.559.627 1.464.627 2.726 0 .99-.407 1.913-1.22 2.777a40.35 40.35 0 0 1-1.71 1.651c-.61.55-1.202 1.202-1.76 1.947-.958-.33-2.295-.592-4.006-.77-1.71-.186-3.59-.288-5.647-.322z\"/>",
+    Q: "<linearGradient id=\"a\" x1=\"21.253\" x2=\"77.764\" y1=\"37.224\" y2=\"37.36\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#fff\"/><stop offset=\"1\" stop-color=\"#fff\" stop-opacity=\"0\"/></linearGradient><path fill=\"#1f1a17\" d=\"M24.95 10.752c-.94 0-1.745-.33-2.397-.99s-.974-1.465-.974-2.405c0-.931.322-1.727.974-2.387s1.456-.99 2.396-.99c.923 0 1.727.33 2.396.99a3.23 3.23 0 0 1 1 2.387c0 .94-.33 1.744-1 2.405-.669.66-1.473.99-2.396.99zm15.281 33.19c-.812.71-2.633 1.304-5.46 1.786-2.828.474-6.088.72-9.771.72-3.75 0-7.053-.254-9.898-.745-2.844-.5-4.64-1.118-5.384-1.863l1.566-5.952-.694-3.895L8.405 30.2 6.297 14.774l1.21-.474 6.8 11.455.152-13.64 1.685-.296 5.182 13.716 2.776-14.757h1.72l2.776 14.706L33.73 11.82l1.71.296.153 13.64 6.824-11.48 1.16.541-2.058 15.359-2.21 3.793-.694 3.945zM14.535 11.989c-.948 0-1.752-.322-2.413-.974-.66-.652-.99-1.456-.99-2.396 0-.923.33-1.719.99-2.38s1.465-.99 2.413-.99c.923 0 1.719.33 2.38.99s.99 1.457.99 2.38c0 .94-.33 1.744-.99 2.396a3.266 3.266 0 0 1-2.38.974m20.828 0c-.94 0-1.736-.322-2.387-.974-.652-.652-.982-1.456-.982-2.396 0-.923.33-1.719.982-2.38s1.447-.99 2.387-.99c.948 0 1.753.33 2.413.99s.99 1.457.99 2.38c0 .94-.33 1.744-.99 2.396s-1.465.974-2.413.974M5.4 14.723c-.94 0-1.736-.33-2.388-.982s-.982-1.448-.982-2.396c0-.923.33-1.719.982-2.388C3.664 8.28 4.46 7.95 5.4 7.95c.948 0 1.744.33 2.413 1.007.66.67.99 1.465.99 2.388 0 .948-.33 1.744-.99 2.396a3.323 3.323 0 0 1-2.413.982m39.141 0c-.94 0-1.744-.33-2.404-.982s-.991-1.448-.991-2.396q0-1.3845.99-2.388c.66-.677 1.465-1.007 2.405-1.007.931 0 1.727.33 2.388 1.007.66.67.99 1.465.99 2.388 0 .948-.33 1.744-.99 2.396a3.28 3.28 0 0 1-2.388.982\"/><path fill=\"url(#a)\" d=\"M37.2 35.73c-3.04-.84-7.095-1.262-12.15-1.262-5.096 0-9.194.431-12.301 1.286l.372 2.507c3.124-.813 7.095-1.22 11.93-1.22 4.809 0 8.729.398 11.752 1.194zm1.736-4.437c-1.372-.5-3.302-.906-5.791-1.228-2.49-.322-5.233-.483-8.247-.483-2.946 0-5.638.153-8.085.458-2.447.304-4.378.702-5.783 1.202l1.245 2.252c1.388-.406 3.191-.703 5.41-.89 2.21-.177 4.631-.27 7.264-.27s5.063.093 7.29.27q3.3525.2805 5.436.915zm-1.092 11.853-.737-2.93c-3.226-.736-7.281-1.109-12.158-1.109-4.826 0-8.864.373-12.107 1.11l-.788 2.954c3.142-.956 7.443-1.44 12.92-1.44 2.625 0 5.072.136 7.316.399 2.252.262 4.106.601 5.554 1.016\"/>",
+    R: "<linearGradient id=\"a\" x1=\"21.192\" x2=\"77.736\" y1=\"37.552\" y2=\"37.429\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#fff\"/><stop offset=\"1\" stop-color=\"#fff\" stop-opacity=\"0\"/></linearGradient><path fill=\"#1f1a17\" d=\"M28.408 9.22h4.216V5.825h6.799v9.296l-5.503 4.242v11.862l4.216 4.216v5.08h3.793v5.927H8.071V40.52h3.793v-5.08l4.242-4.216V19.363l-5.504-4.242V5.825h6.774V9.22h4.242V5.825h6.79z\"/><path fill=\"url(#a)\" d=\"M25.013 35.043h-10.27L13.6 36.11v1.44h22.826v-1.44l-1.143-1.067zM13.6 40.123v2.532h22.826v-2.532zM25.013 13.04h-12.7v1.142l1.812 1.364h21.801l1.761-1.364V13.04zm0 4.19h-8.679l1.482 1.169v1.414h14.393v-1.414l1.482-1.168zm0 13.547h-7.197v1.143l-1.482 1.44h17.357l-1.482-1.44v-1.143z\"/>",
+    B: "<linearGradient id=\"a\" x1=\"21.094\" x2=\"77.669\" y1=\"37.101\" y2=\"37.469\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#fff\"/><stop offset=\"1\" stop-color=\"#fff\" stop-opacity=\"0\"/></linearGradient><path fill=\"#1f1a17\" d=\"M25 42.162c-.229.94-.516 1.592-.847 1.956-.33.364-.762.745-1.312 1.143-.593.415-1.295.762-2.108 1.05s-1.71.364-2.701.211l-6.968-.965a2.858 2.858 0 0 0-.762 0c-.22.034-.432.051-.635.051-.347 0-.787.076-1.32.237-.543.153-.958.381-1.254.677l-2.405-3.945c.297-.33.56-.559.788-.694.237-.127.508-.271.821-.415a9.179 9.179 0 0 1 3.073-.821c.466-.034.923-.043 1.364-.026a9.8 9.8 0 0 0 1.397-.05c.889.152 1.786.287 2.684.406.905.127 1.811.254 2.717.39.991 0 1.66-.102 2.007-.297.186-.102.474-.288.872-.55.398-.263.796-.652 1.194-1.169-.88-.093-1.77-.262-2.684-.508a24.094 24.094 0 0 1-2.405-.753l2.583-6.401c-1.296-.745-2.193-1.338-2.71-1.795a5.3 5.3 0 0 1-1.21-1.575c-.432-.762-.712-1.498-.83-2.21a9.341 9.341 0 0 1-.16-1.913c.016-.99.245-2.083.702-3.285.457-1.194 1.312-2.27 2.565-3.209a79.091 79.091 0 0 0 3.057-2.455 27.746 27.746 0 0 0 2.946-2.955c-1.22-.627-1.829-1.626-1.829-2.997 0-.932.322-1.72.974-2.388.652-.66 1.456-.99 2.396-.99.923 0 1.719.33 2.38.99.66.669.99 1.456.99 2.388q0 2.031-1.83 2.997a26.796 26.796 0 0 0 2.914 2.955 56.74 56.74 0 0 0 3.09 2.455c1.236.94 2.083 2.015 2.523 3.209.449 1.202.694 2.294.72 3.285 0 .567-.051 1.202-.17 1.913s-.38 1.448-.796 2.21a6.084 6.084 0 0 1-1.253 1.575c-.5.457-1.388 1.05-2.667 1.795l2.583 6.4c-.729.263-1.55.517-2.456.754-.914.246-1.786.415-2.633.508.381.517.77.906 1.168 1.169.398.262.695.448.898.55.347.195 1.016.296 2.007.296a263.35 263.35 0 0 1 2.692-.39 81.13 81.13 0 0 0 2.718-.406c.44.051.889.068 1.346.051a13.12 13.12 0 0 1 1.405.026 9.627 9.627 0 0 1 3.074.82c.296.145.567.289.804.416.246.135.508.364.804.694l-2.43 3.945c-.296-.296-.71-.524-1.253-.677-.533-.16-.965-.237-1.295-.237-.22 0-.44-.017-.66-.05a2.794 2.794 0 0 0-.754 0l-6.95.964c-.992.153-1.914.085-2.761-.194-.855-.28-1.558-.652-2.1-1.118-.542-.449-.982-.83-1.304-1.151-.321-.322-.592-.957-.804-1.897\"/><path fill=\"url(#a)\" d=\"M24.086 23.705v2.108c0 .61.304.914.914.914s.914-.304.914-.914v-2.134h2.236c.575 0 .872-.296.872-.897 0-.593-.297-.889-.872-.889h-2.236v-2.235c0-.61-.304-.915-.914-.915s-.914.305-.914.915v2.235H21.9c-.584 0-.872.296-.872.889 0 .601.288.897.872.897zm7.51 13.741-1.042-2.531c-1.685-.364-3.539-.542-5.554-.542-1.998 0-3.835.178-5.503.542l-1.042 2.506c2.05-.517 4.234-.77 6.545-.77 2.286 0 4.479.262 6.596.795m-2.083-5.114-.72-1.735v-.67a27.03 27.03 0 0 0-3.793-.27 27.35 27.35 0 0 0-3.768.27l-.025.67-.669 1.735A25.85 25.85 0 0 1 25 31.96c1.592 0 3.09.127 4.513.372m-.864 9.381c-.66-.5-1.33-1.287-1.99-2.362h-.787c0 .813.186 1.6.567 2.362zm-5.114 0c.381-.812.576-1.6.576-2.362h-.796c-.643 1.059-1.312 1.846-2.015 2.362z\"/>",
+    N: "<linearGradient id=\"a\" x1=\"21.253\" x2=\"77.641\" y1=\"37.592\" y2=\"37.469\" gradientUnits=\"userSpaceOnUse\"><stop offset=\"0\" stop-color=\"#fff\"/><stop offset=\"1\" stop-color=\"#fff\" stop-opacity=\"0\"/></linearGradient><path fill=\"#1f1a17\" d=\"M26.178 9.395c2.6.17 5.004.838 7.222 2.015 2.21 1.169 4.098 2.676 5.656 4.513 1.092 1.287 2.117 2.845 3.082 4.665a28.684 28.684 0 0 1 2.32 5.774 36.511 36.511 0 0 1 1.253 7.46c.177 2.599.262 5.012.262 7.23v5.402H15.468c-.153 0-.22-.407-.212-1.21.009-.814.06-1.466.16-1.965.06-.398.221-.957.467-1.685.254-.728.66-1.609 1.244-2.65.263-.534.89-1.304 1.88-2.32.999-1.016 2.133-2.201 3.429-3.539.745-.762 1.32-1.719 1.744-2.879.423-1.151.601-2.201.533-3.15a8.37 8.37 0 0 1-2.006 1.22c-3.505 1.253-6.045 3.073-7.612 5.452-.118.153-.49.822-1.117 2.015-.33.627-.618 1.059-.847 1.287-.313.314-.77.491-1.363.525-.923.043-1.643-.398-2.16-1.346-.693.203-1.312.288-1.862.254-.923-.347-1.592-.72-2.006-1.117-.847-.847-1.389-1.685-1.651-2.532a9.43 9.43 0 0 1-.381-2.726c0-1.389.855-3.226 2.582-5.512 2.015-2.625 3.09-4.631 3.217-6.003 0-.593.06-1.261.178-2.007a4.198 4.198 0 0 1 .618-1.49c.22-.33.364-.558.432-.677.076-.127.212-.313.415-.559.144-.203.27-.355.372-.457.093-.11.22-.254.373-.44.178-.212.406-.457.694-.745a18.06 18.06 0 0 1-1.067-7.46c3.285 1.169 6.054 3.015 8.28 5.53.551-1.872 1.626-3.387 3.226-4.539 1.321.923 2.371 2.15 3.15 3.666\"/><path fill=\"url(#a)\" d=\"m15.688 17.786.542-.28c.5-.194.652-.559.474-1.092-.195-.491-.576-.66-1.143-.491-1.947.711-3.294 2.015-4.039 3.92-.118.542.076.914.593 1.118.516.16.864-.017 1.041-.55.136-.28.229-.466.297-.543.186.144.423.246.72.297 1.007.16 1.6-.28 1.76-1.338a1.498 1.498 0 0 0-.245-1.041M11.573 34.55c.06-.153.17-.373.322-.67.28-.693.415-1.108.415-1.244-.026-.457-.271-.694-.72-.694-.33 0-.711.474-1.16 1.414a.97.97 0 0 1-.296.347c-.449.466-.381.855.194 1.168.534.314.94.212 1.245-.321m14.63-9.204c1.16-1.524 1.728-3.217 1.71-5.08-.067-.55-.38-.82-.94-.82-.761 0-1.057.279-.897.837.051.915-.033 1.668-.27 2.261-.382.94-.805 1.643-1.262 2.108-.254.5-.102.864.449 1.092.525.246.931.119 1.21-.398M19.726 13.24a6.798 6.798 0 0 1 .051-1.93c-.99.194-1.922.66-2.802 1.388-.525.28-.652.67-.373 1.169.28.508.67.592 1.169.245.347-.186.669-.355.956-.508.288-.16.618-.28 1-.364zm23.25 31.454c-.017 0 0-.449.042-1.346.131-3.108.096-6.221.076-9.33a26.837 26.837 0 0 0-.889-6.613c-.84-3.31-2.124-6.485-4.072-9.297-2.634-3.845-6.814-6.033-11.286-6.976.126.766.033 1.54.076 2.311a25.82 25.82 0 0 1 4.538 2.032c4.241 2.555 6.414 7.276 7.197 11.93 1.272 6.154.453 11.557.813 17.289zM9.439 30.139c.475-.34.525-.729.144-1.194-.398-.381-.83-.415-1.312-.102-1.007.66-1.55 1.533-1.617 2.608.017.542.347.804.974.77.592-.05.88-.355.863-.922.136-.525.449-.915.948-1.16\"/>",
+    P: "<path fill=\"#1f1a17\" d=\"M25 46.448H11.606a13.139 13.139 0 0 1-.99-5.043c0-2.975.863-5.644 2.598-8.018 1.736-2.365 3.971-4.054 6.697-5.067a6.824 6.824 0 0 1-2.861-2.398c-.737-1.071-1.1-2.283-1.1-3.634 0-1.69.575-3.156 1.735-4.392 1.151-1.244 2.574-1.961 4.267-2.15-1.346-.981-2.015-2.283-2.015-3.89 0-1.351.491-2.513 1.482-3.477.982-.964 2.176-1.442 3.581-1.442 1.389 0 2.582.478 3.573 1.442s1.49 2.126 1.49 3.477c0 1.607-.669 2.909-2.015 3.89 1.693.189 3.116.906 4.267 2.15 1.16 1.236 1.736 2.703 1.736 4.392 0 1.351-.373 2.563-1.126 3.634a7.036 7.036 0 0 1-2.862 2.398c2.726 1.013 4.962 2.702 6.697 5.067 1.736 2.374 2.6 5.043 2.6 8.018q0 2.6085-.966 5.043z\"/>",
+  },
+};
+
+const VARIANTS = {
+  mccooey: {
+    id: 'mccooey',
+    name: "McCooey's Hexagonal Chess",
+    boardRadius: 5, // -> 91 cells
+
+    // Confirmed layout. Verified: bishops on f1/f2/f3 land on three
+    // different cell colours (mid/dark/light) as required, and every
+    // square exists on the board. Files a, b, k, and l are
+    // intentionally empty at the start -- only 9 files are used.
+    // Rank counted from each side's OWN edge (1 = back rank).
+    startingLayout: [
+      { file: 'd', rank: 1, piece: 'R' },
+      { file: 'h', rank: 1, piece: 'R' },
+      { file: 'e', rank: 2, piece: 'N' },
+      { file: 'g', rank: 2, piece: 'N' },
+      { file: 'f', rank: 1, piece: 'B' },
+      { file: 'f', rank: 2, piece: 'B' },
+      { file: 'f', rank: 3, piece: 'B' },
+      { file: 'e', rank: 1, piece: 'Q' },
+      { file: 'g', rank: 1, piece: 'K' },
+      { file: 'c', rank: 1, piece: 'P' },
+      { file: 'd', rank: 2, piece: 'P' },
+      { file: 'e', rank: 3, piece: 'P' },
+      { file: 'f', rank: 4, piece: 'P' },
+      { file: 'g', rank: 3, piece: 'P' },
+      { file: 'h', rank: 2, piece: 'P' },
+      { file: 'i', rank: 1, piece: 'P' },
+    ],
+
+    // Diagonal/vertex-style capture (same movement family as the
+    // bishop) -- lands on the SAME cell colour as the pawn itself.
+    pawnCaptureDirs: { white: [[1, -2], [-1, -1]], black: [[-1, 2], [1, 1]] },
+
+    // McCooey-specific quirk: the centre-file pawn is excluded from
+    // the initial double-step, to stop White grabbing the centre
+    // hex on move 1.
+    fPawnNoDoubleStep: true,
+
+    // McCooey counts stalemate as a plain draw.
+    stalemateResult: 'draw',
+  },
+
+  // Gliński's hexagonal chess -- same board shape/size as McCooey's,
+  // but a different (larger, 9-pawn) starting array, orthogonal/
+  // edge-style pawn captures (lands on a DIFFERENT cell colour each
+  // time, unlike McCooey's), no f-pawn double-step exception, and
+  // stalemate is a 3/4-1/4 partial result rather than an even draw.
+  // Capture directions derived geometrically from our own coordinate
+  // system (verified: the two orthogonal directions 60 degrees off
+  // forward on each side) -- confirmed correct independent of the
+  // exact starting-square data below, which is still a placeholder
+  // pending a confirmed source.
+  glinski: {
+    id: 'glinski',
+    name: "Gliński's Hexagonal Chess",
+    boardRadius: 5,
+    // Confirmed starting layout. 18 pieces per side: 2R+2N+3B+Q+K
+    // (9 non-pawn) + 9 pawns across files b-k, matching "the usual
+    // set increased by one bishop and one pawn" versus orthodox
+    // chess. Bishops stack on f1/f2/f3, same as McCooey's, landing
+    // on three different cell colours (already verified).
+    startingLayout: [
+      { file: 'c', rank: 1, piece: 'R' },
+      { file: 'i', rank: 1, piece: 'R' },
+      { file: 'd', rank: 1, piece: 'N' },
+      { file: 'h', rank: 1, piece: 'N' },
+      { file: 'f', rank: 1, piece: 'B' },
+      { file: 'f', rank: 2, piece: 'B' },
+      { file: 'f', rank: 3, piece: 'B' },
+      { file: 'e', rank: 1, piece: 'Q' },
+      { file: 'g', rank: 1, piece: 'K' },
+      { file: 'b', rank: 1, piece: 'P' },
+      { file: 'c', rank: 2, piece: 'P' },
+      { file: 'd', rank: 3, piece: 'P' },
+      { file: 'e', rank: 4, piece: 'P' },
+      { file: 'f', rank: 5, piece: 'P' },
+      { file: 'g', rank: 4, piece: 'P' },
+      { file: 'h', rank: 3, piece: 'P' },
+      { file: 'i', rank: 2, piece: 'P' },
+      { file: 'k', rank: 1, piece: 'P' },
+    ],
+    pawnCaptureDirs: { white: [[1, -1], [-1, 0]], black: [[1, 0], [-1, 1]] },
+    fPawnNoDoubleStep: false,
+    stalemateResult: 'partial', // 3/4 point to the delivering side, 1/4 to the stalemated side
+  },
+
+  // Invented by I.G. Shafran, 1939 -- a genuinely different board
+  // (70 cells, irregular hexagon) rather than just a different
+  // starting array. Board shape and every coordinate below were
+  // derived by walking the hexagon's actual boundary edges and
+  // cross-verified against six independently-sourced reference
+  // squares (both kings, both pairs of rooks) before being confirmed
+  // against a real board diagram. Rank is a direct linear function of
+  // the r-coordinate (rankOffset - r) rather than counted per-file
+  // from each side's own edge -- this is what produces the
+  // characteristic "staircase" where e.g. the i-file never reaches
+  // rank 1 at all. Black's army is NOT a same-file mirror of White's
+  // (a real structural difference from every other variant here) --
+  // it's a 180-degree rotation, landing on entirely different files,
+  // so both colours are listed explicitly rather than derived.
+  // Castling deliberately NOT implemented yet -- planned as a
+  // separate follow-up.
+  shafran: {
+    id: 'shafran',
+    name: "Shafran's Hexagonal Chess",
+    boardBounds: { qMin: -8, qMax: 0, rMin: -5, rMax: 4, sMin: 0, sMax: 9 },
+    rankMode: 'linearR',
+    rankOffset: 5,
+    startingLayout: [
+      // White
+      { file: 'a', rank: 1, piece: 'R', color: 'white' },
+      { file: 'b', rank: 1, piece: 'N', color: 'white' },
+      { file: 'c', rank: 1, piece: 'B', color: 'white' },
+      { file: 'd', rank: 1, piece: 'Q', color: 'white' },
+      { file: 'e', rank: 1, piece: 'K', color: 'white' },
+      { file: 'f', rank: 2, piece: 'B', color: 'white' },
+      { file: 'g', rank: 3, piece: 'N', color: 'white' },
+      { file: 'h', rank: 4, piece: 'B', color: 'white' },
+      { file: 'i', rank: 5, piece: 'R', color: 'white' },
+      { file: 'a', rank: 2, piece: 'P', color: 'white' },
+      { file: 'b', rank: 2, piece: 'P', color: 'white' },
+      { file: 'c', rank: 2, piece: 'P', color: 'white' },
+      { file: 'd', rank: 2, piece: 'P', color: 'white' },
+      { file: 'e', rank: 2, piece: 'P', color: 'white' },
+      { file: 'f', rank: 3, piece: 'P', color: 'white' },
+      { file: 'g', rank: 4, piece: 'P', color: 'white' },
+      { file: 'h', rank: 5, piece: 'P', color: 'white' },
+      { file: 'i', rank: 6, piece: 'P', color: 'white' },
+      // Black -- 180-degree rotation of White's army, NOT a same-file mirror
+      { file: 'i', rank: 10, piece: 'R', color: 'black' },
+      { file: 'h', rank: 10, piece: 'N', color: 'black' },
+      { file: 'g', rank: 10, piece: 'B', color: 'black' },
+      { file: 'f', rank: 10, piece: 'Q', color: 'black' },
+      { file: 'e', rank: 10, piece: 'K', color: 'black' },
+      { file: 'd', rank: 9, piece: 'B', color: 'black' },
+      { file: 'c', rank: 8, piece: 'N', color: 'black' },
+      { file: 'b', rank: 7, piece: 'B', color: 'black' },
+      { file: 'a', rank: 6, piece: 'R', color: 'black' },
+      { file: 'i', rank: 9, piece: 'P', color: 'black' },
+      { file: 'h', rank: 9, piece: 'P', color: 'black' },
+      { file: 'g', rank: 9, piece: 'P', color: 'black' },
+      { file: 'f', rank: 9, piece: 'P', color: 'black' },
+      { file: 'e', rank: 9, piece: 'P', color: 'black' },
+      { file: 'd', rank: 8, piece: 'P', color: 'black' },
+      { file: 'c', rank: 7, piece: 'P', color: 'black' },
+      { file: 'b', rank: 6, piece: 'P', color: 'black' },
+      { file: 'a', rank: 5, piece: 'P', color: 'black' },
+    ],
+    // Diagonal/vertex-style capture, same family as McCooey's (per
+    // the rules text: "a pawn captures diagonally like a bishop, but
+    // one step away") -- distinct from Gliński's orthogonal-style.
+    pawnCaptureDirs: { white: [[1, -2], [-1, -1]], black: [[-1, 2], [1, 1]] },
+    // Pawns can advance to the middle of the board on their first
+    // move: centre files (d/e/f) get a 3-step move, the next ring out
+    // (b/c/g/h) get 2-step, the wing files (a/i) only ever get 1.
+    pawnFirstMoveBonus(file) {
+      if (['d', 'e', 'f'].includes(file)) return 2;
+      if (['b', 'c', 'g', 'h'].includes(file)) return 1;
+      return 0; // a, i
+    },
+    stalemateResult: 'draw',
+    // Castling. Both king/rook destinations for all four flank/kind
+    // combinations were derived from the actual board geometry and
+    // independently verified against two worked examples in the
+    // rules text (long queenside -> black king to h10; short
+    // bishopside -> black king to c8) before being trusted here.
+    hasCastling: true,
+    // Which flank each side's two rooks belong to, keyed by that
+    // rook's OWN starting square -- needed for notation (Q-0-0 /
+    // B-0-0) since, per the rules, the flanks don't correlate between
+    // colours (White's queenside rook shares a starting file with
+    // Black's bishopside rook, not Black's queenside one).
+    castlingRookFlanks: {
+      white: { a1: 'queenside', i5: 'bishopside' },
+      black: { i10: 'queenside', a6: 'bishopside' },
+    },
+  },
+};
+
+let ACTIVE_VARIANT = VARIANTS.mccooey;
+
+// ---------------------------------------------------------------
+// 2c. THEMES
+//     Purely visual, orthogonal to VARIANTS above -- swapping the
+//     ruleset and swapping the look are two independent choices.
+//     Every value here maps directly to a CSS custom property (see
+//     :root in <style>), so applyTheme() is just writing values
+//     into the page's existing variable system.
+// ---------------------------------------------------------------
+
+const THEMES = {
+  woodFelt: {
+    id: 'woodFelt',
+    name: 'Wood & Felt',
+    vars: {
+      '--bg': '#1c2622',
+      '--panel': '#24312b',
+      '--ink': '#ece6d6',
+      '--ink-dim': '#9fab9f',
+      '--cell-light': '#e9d9ac',
+      '--cell-mid': '#c79a52',
+      '--cell-dark': '#7c5330',
+      '--cell-light-hover': '#f5e8bf',
+      '--cell-mid-hover': '#d9ac66',
+      '--cell-dark-hover': '#8f6440',
+      '--line': '#10160f',
+      '--accent': '#6fae8e',
+      '--font-display': "Georgia, 'Times New Roman', serif",
+      '--font-display-style': 'normal',
+      '--font-display-weight': '400',
+      '--font-display-transform': 'none',
+      '--font-display-tracking': '0.04em',
+      '--font-body': "'Iowan Old Style', 'Palatino Linotype', Georgia, serif",
+      '--font-ui': "'Helvetica Neue', Arial, sans-serif",
+      '--radius-panel': '12px',
+      '--radius-control': '7px',
+      '--cell-stroke-width': '1',
+      '--bg-glow': 'radial-gradient(circle at 50% -10%, rgba(111,174,142,0.08), transparent 60%)',
+      '--move-dot-color': 'rgba(20, 24, 18, 0.55)',
+      // Piece medallion colours -- kept clear of all three cell
+      // colours above (maple/oak/walnut) so pieces never blend in.
+      '--piece-white-fill': '#f6efd9',
+      '--piece-white-stroke': '#2a2018',
+      '--piece-black-fill': '#241a12',
+      '--piece-black-stroke': '#f6efd9',
+      '--alert-color': '#b4281e',
+    },
+  },
+
+  // Leans into hex chess's real history: invented and popularized by
+  // hobbyists in 1970s-80s Poland and Britain, with newsletters and
+  // hand-drawn diagrams -- flat poster colour, bold geometric type,
+  // graphic rather than photorealistic wood/felt simulation.
+  constructivist: {
+    id: 'constructivist',
+    name: 'Origins',
+    vars: {
+      '--bg': '#1a2238',
+      '--panel': '#212b47',
+      '--ink': '#f0ead8',
+      '--ink-dim': '#a9a58f',
+      '--cell-light': '#f0ead8',
+      '--cell-mid': '#d9a441',
+      '--cell-dark': '#b5432e',
+      '--cell-light-hover': '#fbf6ea',
+      '--cell-mid-hover': '#e6b358',
+      '--cell-dark-hover': '#c94f38',
+      '--line': '#0f1424',
+      '--accent': '#2f6f6a',
+      '--font-display': "'Archivo Black', sans-serif",
+      '--font-display-style': 'normal',
+      '--font-display-weight': '400',
+      '--font-display-transform': 'uppercase',
+      '--font-display-tracking': '0.01em',
+      '--font-body': "'Space Grotesk', 'Inter', sans-serif",
+      '--font-ui': "'Space Grotesk', 'Inter', sans-serif",
+      '--radius-panel': '4px',
+      '--radius-control': '3px',
+      '--cell-stroke-width': '2',
+      '--bg-glow': 'none',
+      '--move-dot-color': 'rgba(15, 20, 36, 0.6)',
+      // Piece medallions use cool navy/white, deliberately OUTSIDE
+      // the board's warm cream/mustard/oxide-red family -- so a
+      // piece never visually matches the cell it's standing on,
+      // regardless of which of the three cell colours that is.
+      '--piece-white-fill': '#ffffff',
+      '--piece-white-stroke': '#0f1424',
+      '--piece-black-fill': '#0f1424',
+      '--piece-black-stroke': '#f0ead8',
+      // Blue sits roughly complementary to the board's warm palette,
+      // so it reads clearly against cream, mustard, AND oxide-red --
+      // red (the "obvious" alert colour) would wash out against the
+      // oxide-red cells specifically.
+      '--alert-color': '#3159d4',
+    },
+  },
+
+  // Requested palette. Elegant serif mood, light mode -- the easiest
+  // of the three to get strong alert-colour contrast on, since the
+  // dark-green/gold/light-grey cells are well spread in brightness.
+  greenGold: {
+    id: 'greenGold',
+    name: 'Green & Gold',
+    vars: {
+      '--bg': '#ffffff',
+      '--panel': '#f4f4f4',
+      '--ink': '#1c2b24',
+      '--ink-dim': '#6b756f',
+      '--cell-light': '#d8dcdb',
+      '--cell-mid': '#b79257',
+      '--cell-dark': '#004e38',
+      '--cell-light-hover': '#dee2e1',
+      '--cell-mid-hover': '#c3a372',
+      '--cell-dark-hover': '#296a58',
+      '--line': '#26362f',
+      '--accent': '#de6c83',
+      '--font-display': "'Fraunces', serif",
+      '--font-display-style': 'normal',
+      '--font-display-weight': '600',
+      '--font-display-transform': 'none',
+      '--font-display-tracking': '0.01em',
+      '--font-body': "Georgia, 'Iowan Old Style', serif",
+      '--font-ui': "'Helvetica Neue', Arial, sans-serif",
+      '--radius-panel': '14px',
+      '--radius-control': '8px',
+      '--cell-stroke-width': '1',
+      '--bg-glow': 'none',
+      '--move-dot-color': 'rgba(28, 43, 36, 0.55)',
+      // The rose accent (used for selection) tested well against all
+      // three cells on its own, but sharing it with check/capture too
+      // made a selected piece and a checked king look identical --
+      // this deep red is a genuinely distinct hue for that role.
+      '--alert-color': '#d4113b',
+      '--alert-ring-width': '4',
+    },
+  },
+
+  // Requested palette. Deliberately monochrome except one accent --
+  // the darkest cell (mid-grey, not near-black) was specifically
+  // chosen to avoid the piece-legibility problem the first attempt
+  // at this kind of palette (Boston Blues) ran into: black Merida
+  // pieces get a healthy 2.8 contrast ratio against this dark cell,
+  // versus 1.25 against Boston Blues' near-black navy. Kept the given
+  // red as both accent and alert colour -- a grid search for
+  // alternatives only found marginally-better or actively worse
+  // options, and introducing an unrelated hue would have broken the
+  // "grey + one accent" identity for little real gain.
+  blackWhite: {
+    id: 'blackWhite',
+    name: 'Black & White',
+    vars: {
+      '--bg': '#eeeeee',
+      '--panel': '#ffffff',
+      '--ink': '#1e1e1e',
+      '--ink-dim': '#767676',
+      '--cell-light': '#f0f0f0',
+      '--cell-mid': '#aaaaaa',
+      '--cell-dark': '#555555',
+      '--cell-light-hover': '#f5f5f5',
+      '--cell-mid-hover': '#b8b8b8',
+      '--cell-dark-hover': '#6a6a6a',
+      '--line': '#2b2b2b',
+      // Kept red (--alert-color below) for check/capture, but
+      // selection now gets its own distinct blue -- previously both
+      // used this same red, which made a selected piece and a
+      // checked king look identical.
+      '--accent': '#3c7add',
+      '--font-display': "'Inter', 'Helvetica Neue', sans-serif",
+      '--font-display-style': 'normal',
+      '--font-display-weight': '500',
+      '--font-display-transform': 'none',
+      '--font-display-tracking': '0em',
+      '--font-body': "'Inter', 'Helvetica Neue', sans-serif",
+      '--font-ui': "'Inter', 'Helvetica Neue', sans-serif",
+      '--radius-panel': '10px',
+      '--radius-control': '6px',
+      '--cell-stroke-width': '1',
+      '--bg-glow': 'none',
+      '--move-dot-color': 'rgba(0, 0, 0, 0.55)',
+      '--alert-color': '#df2935',
+      '--alert-ring-width': '4',
+    },
+  },
+
+  // Requested palette. Elegant serif again, but in a different key
+  // than Green & Gold -- italic Fraunces for a softer, dreamier
+  // display treatment rather than upright weight-600. The dark cell
+  // is a genuine medium blue (not near-black), which is what makes
+  // black pieces work here at all: 2.8 contrast ratio against it,
+  // the same healthy margin as Black & White's dark cell.
+  starryNight: {
+    id: 'starryNight',
+    name: 'Starry Night',
+    vars: {
+      '--bg': '#071449',
+      '--panel': '#25305f',
+      '--ink': '#eaf0fa',
+      '--ink-dim': '#8fa3c9',
+      '--cell-light': '#6dadde',
+      '--cell-mid': '#3678cf',
+      '--cell-dark': '#1651ab',
+      '--cell-light-hover': '#7fb7e2',
+      '--cell-mid-hover': '#4e88d5',
+      '--cell-dark-hover': '#3266b5',
+      '--line': '#030a24',
+      '--accent': '#eded4c',
+      '--font-display': "'Fraunces', serif",
+      '--font-display-style': 'italic',
+      '--font-display-weight': '400',
+      '--font-display-transform': 'none',
+      '--font-display-tracking': '0.01em',
+      '--font-body': "Georgia, 'Iowan Old Style', serif",
+      '--font-ui': "'Helvetica Neue', Arial, sans-serif",
+      '--radius-panel': '14px',
+      '--radius-control': '8px',
+      '--cell-stroke-width': '1',
+      '--bg-glow': 'radial-gradient(circle at 50% -10%, rgba(237,237,76,0.08), transparent 60%)',
+      '--move-dot-color': 'rgba(0, 0, 0, 0.55)',
+      // The pale yellow accent (used for selection) previously did
+      // double duty for check/capture too, making a selected piece
+      // and a checked king look identical -- this deeper amber-orange
+      // is a genuinely distinct hue for that role.
+      '--alert-color': '#ffba1a',
+      '--alert-ring-width': '4',
+    },
+  },
+
+  // Requested palette (v2 -- replaces an earlier Supernova attempt
+  // that had the same near-black-cell piece-legibility problem as
+  // the original Boston Blues). This palette's darkest cell (a vivid
+  // violet, not near-black) gives black pieces a healthy 2.7 contrast
+  // ratio. The given accent (cyan) tested weak against the light
+  // magenta cell specifically (1.54) -- grid search found a pale
+  // yellow-green with nearly double that (3.28), used for the alert
+  // colour while cyan stays as the UI accent exactly as given.
+  // Monoton (neon-tube display face) reused from the original
+  // Supernova brief, per instruction.
+  supernova: {
+    id: 'supernova',
+    name: 'Supernova',
+    vars: {
+      '--bg': '#172121',
+      '--panel': '#3c4545',
+      '--ink': '#eafbfb',
+      '--ink-dim': '#9fc2c2',
+      '--cell-light': '#ff00c1',
+      '--cell-mid': '#9600ff',
+      '--cell-dark': '#4900ff',
+      '--cell-light-hover': '#ff1fc8',
+      '--cell-mid-hover': '#a31fff',
+      '--cell-dark-hover': '#5f1fff',
+      '--line': '#0a1010',
+      '--accent': '#00b8ff',
+      '--font-display': "'Monoton', cursive",
+      '--font-display-style': 'normal',
+      '--font-display-weight': '400',
+      '--font-display-transform': 'uppercase',
+      '--font-display-tracking': '0.04em',
+      '--font-body': "'Space Grotesk', 'Inter', sans-serif",
+      '--font-ui': "'Space Grotesk', 'Inter', sans-serif",
+      '--radius-panel': '6px',
+      '--radius-control': '4px',
+      '--cell-stroke-width': '2',
+      '--bg-glow': 'radial-gradient(circle at 50% -10%, rgba(150,0,255,0.15), transparent 60%)',
+      '--move-dot-color': 'rgba(255, 255, 255, 0.65)',
+      '--alert-color': '#f8ff99',
+      '--alert-ring-width': '4',
+    },
+  },
+};
+
+function applyTheme(theme) {
+  const root = document.documentElement;
+  Object.entries(theme.vars).forEach(([key, value]) => root.style.setProperty(key, value));
+  root.dataset.theme = theme.id;
+}
+
+// Build the full two-colour position from a variant's starting
+// layout. Two entry styles are supported: the default (no `color`
+// field) assumes White at (file,rank), with Black auto-derived as
+// the mirror image on the SAME file, counted from Black's edge --
+// this covers McCooey's and Gliński's, where the armies really are
+// same-file mirrors of each other. Entries WITH an explicit `color`
+// are placed exactly as given, no mirroring -- needed for Shafran's,
+// where Black's army is a 180-degree rotation of White's (landing on
+// different files entirely, not just different ranks of the same
+// file), so both colours are listed out explicitly in that variant's
+// startingLayout instead.
+function buildStartingPosition(variant, cellsByLabel, fileHeights) {
+  const pieces = {}; // label -> { piece, color }
+  variant.startingLayout.forEach((entry) => {
+    const { file, rank, piece } = entry;
+    if (entry.color) {
+      pieces[`${file}${rank}`] = { piece, color: entry.color };
+      return;
+    }
+    const height = fileHeights[file];
+    const whiteLabel = `${file}${rank}`;
+    const blackLabel = `${file}${height - rank + 1}`;
+    pieces[whiteLabel] = { piece, color: 'white' };
+    pieces[blackLabel] = { piece, color: 'black' };
+  });
+  return pieces;
+}
+
+// ---------------------------------------------------------------
+// 3. RENDER
+//    initGame(variant) rebuilds the board and all game state from
+//    scratch for the given variant -- this is what makes variant
+//    switching possible, not just the config object above.
+// ---------------------------------------------------------------
+
+const svg = document.getElementById('board-svg');
+const size = BOARD_CONFIG.hexSize;
+const readout = document.getElementById('hover-readout');
+const turnIndicator = document.getElementById('turn-indicator');
+const moveHistoryList = document.getElementById('move-history-list');
+const capturedByWhiteEl = document.getElementById('captured-by-white');
+const capturedByBlackEl = document.getElementById('captured-by-black');
+const materialDiffEl = document.getElementById('material-diff');
+const promotionModal = document.getElementById('promotion-modal');
+const promotionOptionsEl = document.getElementById('promotion-options');
+const menuOverlay = document.getElementById('menu-overlay');
+const startGameBtn = document.getElementById('start-game-btn');
+
+// Shown automatically on a genuinely first-ever visit (see the
+// startup block at the bottom of this script) and via "New Game" any
+// time after. New Game resets to a fresh game BEFORE showing the
+// menu (see its handler), so this is now always reached with a
+// genuinely fresh, zero-move game already in place -- which is what
+// makes it safe for the menu's own controls to apply live as they're
+// changed, without a "Back to Game" case to worry about: there's no
+// longer any in-progress game a live change could disrupt, since New
+// Game is the only way back into the menu at all.
+function showMenu() {
+  menuOverlay.classList.add('show');
+}
+function hideMenu() {
+  menuOverlay.classList.remove('show');
+  // Persist current settings the moment the menu closes, even if
+  // nothing was actively changed -- otherwise a first-ever visit
+  // where the person just clicks through without touching anything
+  // would leave nothing saved, and the menu would wrongly reappear
+  // on their very next visit too.
+  savePrefs();
+  scheduleComputerMoveIfNeeded(); // e.g. computer plays White and its opening move was held back while the menu was open
+}
+const undoBtn = document.getElementById('undo-btn');
+const variantSubtitle = document.getElementById('variant-subtitle');
+const footerNote = document.getElementById('footer-note');
+
+// Everything visual lives inside this group so a single transform
+// (for board-flip) rotates the whole board at once. Created once;
+// its CONTENTS get rebuilt by initGame() on every variant switch.
+const boardGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+boardGroup.setAttribute('id', 'board-group');
+svg.appendChild(boardGroup);
+
+// Board/engine state -- all reassigned by initGame(). Declared here
+// (rather than inline further down) so every function below can
+// close over the current values via normal scope, the same as
+// before; only the "assign once at load" pattern is changing.
+let cells, boardCenterX, boardCenterY, fileHeights, fileMinRanks, cellsByLabel, validCellKeys, cellByKey;
+let boardState, turn, selectedKey, legalMoves, gameOver, gameOverMessage, enPassantTargets, moveHistory;
+let capturedByWhite, capturedByBlack; // arrays of piece-type letters (the OPPONENT's pieces each side has taken)
+let pendingPromotion; // stashed move context while the promotion picker is open, or null
+let moveSnapshots; // stack of full-state snapshots, one per completed move, for undo
+let pendingFlipTimeout; // id of a scheduled auto-flip, so undo can cancel one that hasn't fired yet
+let piecesLayer, highlightLayer;
+
+function initGame(variant, restoreState) {
+  ACTIVE_VARIANT = variant;
+
+  cells = generateBoardCells(getBoardBounds(variant));
+  assignLabels(cells, variant);
+
+  const pts = cells.map(c => axialToPixel(c.q, c.r, size));
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const pad = size * 1.4;
+  const minX = Math.min(...xs) - pad, maxX = Math.max(...xs) + pad;
+  const minY = Math.min(...ys) - pad, maxY = Math.max(...ys) + pad;
+  const width = maxX - minX, height = maxY - minY;
+
+  svg.setAttribute('viewBox', `${minX} ${minY} ${width} ${height}`);
+  boardCenterX = minX + width / 2;
+  boardCenterY = minY + height / 2;
+
+  boardGroup.innerHTML = ''; // wipe previous variant's cells/pieces/highlights entirely
+  boardGroup.removeAttribute('transform');
+
+  cells.forEach(cell => {
+    const { x, y } = axialToPixel(cell.q, cell.r, size);
+    const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    poly.setAttribute('points', hexPointsAttr(x, y, size));
+    poly.setAttribute('class', `cell ${cellColor(cell.q, cell.r)}`);
+    poly.dataset.label = cell.label;
+    poly.dataset.cellKey = cellKey(cell.q, cell.r);
+
+    poly.addEventListener('mouseenter', () => {
+      const occupant = boardState.get(cellKey(cell.q, cell.r));
+      if (occupant) {
+        const colorName = occupant.color === 'white' ? 'White' : 'Black';
+        readout.textContent = `${cell.label} — ${colorName} ${PIECE_NAME[occupant.piece]}`;
+      } else {
+        readout.textContent = cell.label;
+      }
+    });
+    poly.addEventListener('mouseleave', () => { readout.textContent = '\u00A0'; });
+    poly.addEventListener('click', () => onCellClick(poly));
+
+    boardGroup.appendChild(poly);
+
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    // x/y stay fixed at the TRUE cell centre permanently -- the offset
+    // toward what's normally the "bottom" of the hex lives entirely in
+    // the `transform` attribute (see positionCoordLabels()), not here.
+    label.setAttribute('x', x);
+    label.setAttribute('y', y);
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('class', 'coord-label');
+    label.textContent = cell.label;
+    boardGroup.appendChild(label);
+  });
+
+  fileHeights = {};
+  fileMinRanks = {};
+  cells.forEach(c => {
+    fileHeights[c.file] = Math.max(fileHeights[c.file] ?? -Infinity, c.rank);
+    fileMinRanks[c.file] = Math.min(fileMinRanks[c.file] ?? Infinity, c.rank);
+  });
+
+  cellsByLabel = {};
+  cells.forEach(c => { cellsByLabel[c.label] = c; });
+
+  validCellKeys = new Set(cells.map(c => cellKey(c.q, c.r)));
+  cellByKey = {};
+  cells.forEach(c => { cellByKey[cellKey(c.q, c.r)] = c; });
+
+  const position = buildStartingPosition(variant, cellsByLabel, fileHeights);
+  const freshBoardState = new Map();
+  Object.entries(position).forEach(([label, { piece, color }]) => {
+    const cell = cellsByLabel[label];
+    freshBoardState.set(cellKey(cell.q, cell.r), { piece, color, moved: false });
+  });
+
+  if (restoreState) {
+    boardState = new Map(restoreState.boardState);
+    turn = restoreState.turn;
+    moveHistory = restoreState.moveHistory;
+    capturedByWhite = restoreState.capturedByWhite;
+    capturedByBlack = restoreState.capturedByBlack;
+    enPassantTargets = restoreState.enPassantTargets;
+    flipped = restoreState.flipped;
+    gameOver = restoreState.gameOver;
+    gameOverMessage = restoreState.gameOverMessage;
+  } else {
+    boardState = freshBoardState;
+    turn = 'white';
+    moveHistory = [];
+    capturedByWhite = [];
+    capturedByBlack = [];
+    enPassantTargets = [];
+    flipped = desiredFlipState(); // faces the human's side by default -- matters when the computer plays White
+    gameOver = false;
+    gameOverMessage = '';
+  }
+
+  selectedKey = null;
+  legalMoves = [];
+  pendingPromotion = null;
+  promotionModal.classList.remove('show');
+  moveSnapshots = []; // undo history intentionally does NOT persist across reloads
+  clearTimeout(pendingFlipTimeout);
+  pendingFlipTimeout = null;
+  updateUndoButtonState();
+
+  piecesLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  highlightLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  boardGroup.appendChild(highlightLayer); // below pieces, above cells
+  boardGroup.appendChild(piecesLayer);
+
+  variantSubtitle.textContent = variant.name;
+  footerNote.textContent = `${variant.name}. Click a piece, then a highlighted cell to move.`;
+
+  // Match the board's own rotation to a restored flip state. Safe to
+  // set directly (no unwanted animation): boardGroup's transform was
+  // just reset a moment ago and hasn't been painted since, so there's
+  // no committed "before" frame for the transition to animate from --
+  // same reasoning as elsewhere in this file where a fresh element's
+  // first style change doesn't visibly animate.
+  boardGroup.setAttribute('transform', `rotate(${flipped ? 180 : 0} ${boardCenterX} ${boardCenterY})`);
+  positionCoordLabels(); // now that `flipped` is finalized -- see its own comment for why this matters
+
+  renderPieces();
+  updateTurnIndicator();
+  updateCheckHighlight();
+  renderMoveHistory();
+  renderCapturedTray();
+
+  saveGameState(); // persist whatever we just set up, fresh or restored
+  scheduleComputerMoveIfNeeded(); // e.g. reloading mid-game with the computer to move
+}
+
+// ---------------------------------------------------------------
+// 4. MOVE-GENERATION ENGINE
+//    Pure logic, no DOM access -- operates only on plain data
+//    (a Map of "q,r" -> {piece, color, moved}). This is the
+//    boundary that keeps AI players / online play possible later
+//    without touching this code (see the state/rules/UI split
+//    from our platform discussion).
+// ---------------------------------------------------------------
+
+function cellKey(q, r) { return `${q},${r}`; }
+
+// The three orthogonal ("rook") directions and their opposites --
+// six total, each 60 degrees apart. Rooks/queens/kings slide or
+// step along these; files (constant q) are one of these directions.
+const ORTHO_DIRS = [[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
+
+// The six diagonal ("bishop") directions -- through cell vertices,
+// each the sum of two adjacent orthogonal directions. Bishops
+// always land on same-coloured cells when moving along these.
+const DIAG_DIRS = [[1,1],[2,-1],[1,-2],[-1,-1],[-2,1],[-1,2]];
+
+const ALL_DIRS = ORTHO_DIRS.concat(DIAG_DIRS); // king's 12 directions
+
+// Knight offsets: 2 steps in one orthogonal direction, then 1 step
+// in a direction 60 degrees off from it. Verified to produce
+// exactly 12 unique destinations (see project notes).
+function computeKnightOffsets() {
+  const offsets = new Map();
+  for (let i = 0; i < 6; i++) {
+    const d1 = ORTHO_DIRS[i];
+    const neighbors = [ORTHO_DIRS[(i + 1) % 6], ORTHO_DIRS[(i + 5) % 6]];
+    neighbors.forEach(d2 => {
+      const off = [2 * d1[0] + d2[0], 2 * d1[1] + d2[1]];
+      offsets.set(off.join(','), off);
+    });
+  }
+  return [...offsets.values()];
+}
+const KNIGHT_OFFSETS = computeKnightOffsets();
+
+// Pawn forward direction is always the "file" orthogonal direction --
+// this part is universal, not variant-specific. Capture directions
+// DO vary by variant (see VARIANTS above) and are read from
+// ACTIVE_VARIANT.pawnCaptureDirs wherever a pawn move is generated.
+const PAWN_FORWARD = { white: [0, -1], black: [0, 1] };
+
+function addVec(q, r, [dq, dr]) { return [q + dq, r + dr]; }
+
+// Sliding moves (rook/bishop/queen): walk each direction until off
+// the board, blocked by own piece (stop before), or a capture
+// (stop after including that square).
+function slideMoves(q, r, color, boardState, directions) {
+  const moves = [];
+  directions.forEach(dir => {
+    let [cq, cr] = [q, r];
+    while (true) {
+      [cq, cr] = addVec(cq, cr, dir);
+      const k = cellKey(cq, cr);
+      if (!validCellKeys.has(k)) break;
+      const occupant = boardState.get(k);
+      if (!occupant) { moves.push(k); continue; }
+      if (occupant.color !== color) moves.push(k); // capture
+      break; // blocked either way
+    }
+  });
+  return moves;
+}
+
+// Single-step moves (king/knight): land in-bounds, not on own piece.
+function stepMoves(q, r, color, boardState, offsets) {
+  const moves = [];
+  offsets.forEach(off => {
+    const [nq, nr] = addVec(q, r, off);
+    const k = cellKey(nq, nr);
+    if (!validCellKeys.has(k)) return;
+    const occupant = boardState.get(k);
+    if (!occupant || occupant.color !== color) moves.push(k);
+  });
+  return moves;
+}
+
+// How many EXTRA squares (beyond the mandatory first one) an unmoved
+// pawn on the given file may advance. McCooey's/Gliński's: 1 for
+// every file (McCooey's f-file is the sole exception, at 0). Shafran's
+// varies by file (0/1/2) -- see its VARIANTS entry for the exact
+// table, derived from "pawns can advance to the middle of the board".
+function pawnFirstMoveBonus(variant, file) {
+  if (variant.pawnFirstMoveBonus) return variant.pawnFirstMoveBonus(file);
+  if (variant.fPawnNoDoubleStep && file === 'f') return 0;
+  return 1;
+}
+
+function pawnMoves(q, r, color, boardState, fromCell, enPassantTargets) {
+  const moves = [];
+  const forward = PAWN_FORWARD[color];
+  const piece = boardState.get(cellKey(q, r));
+  const maxSteps = piece.moved ? 1 : 1 + pawnFirstMoveBonus(ACTIVE_VARIANT, fromCell.file);
+
+  let [cq, cr] = [q, r];
+  for (let step = 0; step < maxSteps; step++) {
+    const [nq, nr] = addVec(cq, cr, forward);
+    const nk = cellKey(nq, nr);
+    if (!validCellKeys.has(nk) || boardState.get(nk)) break; // blocked or off-board -- stop advancing
+    moves.push({ to: nk, capture: false, capturedKey: nk });
+    cq = nq; cr = nr;
+  }
+
+  ACTIVE_VARIANT.pawnCaptureDirs[color].forEach(dir => {
+    const [aq, ar] = addVec(q, r, dir);
+    const k = cellKey(aq, ar);
+    if (!validCellKeys.has(k)) return;
+    const occupant = boardState.get(k);
+    if (occupant) {
+      if (occupant.color !== color) moves.push({ to: k, capture: true, capturedKey: k });
+      return; // occupied (by either side) -- no en passant possible on a non-empty square
+    }
+    // The square itself is empty (that's the point of en passant) --
+    // the piece actually captured sits on a different square,
+    // recorded when the opposing pawn made its multi-step move.
+    // enPassantTargets is a LIST because a 3-step first move (e.g.
+    // Shafran's centre files) passes over two intermediate squares,
+    // either of which can be used to capture en passant.
+    const ep = enPassantTargets.find(t => t.key === k && t.color === color);
+    if (ep) moves.push({ to: k, capture: true, enPassant: true, capturedKey: ep.capturedKey });
+  });
+  return moves;
+}
+
+// Castling (Shafran's only -- gated by ACTIVE_VARIANT.hasCastling).
+// Walks each of the 6 orthogonal directions from the king looking for
+// an unmoved same-colour rook with a clear path to it; for each one
+// found, offers both "short" (king+2, rook ends adjacent) and "long"
+// (king+3, rook ends adjacent) castling, PROVIDED every square the
+// king passes through (including its start and destination) is safe
+// -- checked here at generation time using the CURRENT board's
+// attacked-squares set, since the standard post-hoc legality filter
+// only re-checks the final square, not the whole path.
+function castlingMoves(q, r, color, boardState) {
+  if (!ACTIVE_VARIANT.hasCastling) return [];
+  const kingKey = cellKey(q, r);
+  const king = boardState.get(kingKey);
+  if (!king || king.moved) return [];
+
+  const enemyAttacks = attackedSquares(opponentOf(color), boardState);
+  if (enemyAttacks.has(kingKey)) return []; // can't castle out of check
+
+  const moves = [];
+  ORTHO_DIRS.forEach(dir => {
+    // Walk outward from the king until we hit something or the board edge.
+    let [cq, cr] = [q, r];
+    let distance = 0;
+    while (true) {
+      cq += dir[0]; cr += dir[1];
+      distance++;
+      const k = cellKey(cq, cr);
+      if (!validCellKeys.has(k)) return; // ran off the board -- no rook this direction
+      const occupant = boardState.get(k);
+      if (occupant) {
+        if (occupant.piece === 'R' && occupant.color === color && !occupant.moved && distance >= 4) {
+          [[2, 'short'], [3, 'long']].forEach(([kingSteps, kind]) => {
+            const kingDestQ = q + dir[0] * kingSteps, kingDestR = r + dir[1] * kingSteps;
+            const rookDestQ = kingDestQ - dir[0], rookDestR = kingDestR - dir[1];
+            const kingDestKey = cellKey(kingDestQ, kingDestR);
+            const rookDestKey = cellKey(rookDestQ, rookDestR);
+            // Every square the king actually passes through (steps 1..kingSteps) must be safe.
+            let pathSafe = true;
+            for (let s = 1; s <= kingSteps; s++) {
+              const pathKey = cellKey(q + dir[0] * s, r + dir[1] * s);
+              if (enemyAttacks.has(pathKey)) { pathSafe = false; break; }
+            }
+            if (pathSafe) {
+              moves.push({
+                to: kingDestKey,
+                capture: false,
+                capturedKey: kingDestKey,
+                castling: { kind, rookFromKey: k, rookToKey: rookDestKey },
+              });
+            }
+          });
+        }
+        return; // first occupied square in this direction, whether a valid rook or not -- stop searching
+      }
+    }
+  });
+  return moves;
+}
+
+// Returns pseudo-legal moves (does not yet check whether the move
+// would leave the mover's own king in check -- that's check
+// detection, a later step).
+function generateMoves(q, r, boardState, enPassantTargets) {
+  const key = cellKey(q, r);
+  const piece = boardState.get(key);
+  if (!piece) return [];
+  const { piece: type, color } = piece;
+  const cell = cellByKey[key];
+
+  if (type === 'P') return pawnMoves(q, r, color, boardState, cell, enPassantTargets);
+
+  let destinations = [];
+  if (type === 'R') destinations = slideMoves(q, r, color, boardState, ORTHO_DIRS);
+  else if (type === 'B') destinations = slideMoves(q, r, color, boardState, DIAG_DIRS);
+  else if (type === 'Q') destinations = slideMoves(q, r, color, boardState, ALL_DIRS);
+  else if (type === 'K') destinations = stepMoves(q, r, color, boardState, ALL_DIRS);
+  else if (type === 'N') destinations = stepMoves(q, r, color, boardState, KNIGHT_OFFSETS);
+
+  const normalMoves = destinations.map(to => ({ to, capture: !!boardState.get(to), capturedKey: to }));
+  if (type === 'K') return normalMoves.concat(castlingMoves(q, r, color, boardState));
+  return normalMoves;
+}
+
+// ---------------------------------------------------------------
+// 6. CHECK / CHECKMATE / STALEMATE DETECTION
+//    Built entirely on top of the pseudo-legal generators above --
+//    "is X attacked" reuses the exact same movement logic as
+//    "where can X move", which keeps this honest: if a piece's
+//    move generation is correct, its attack detection is too.
+// ---------------------------------------------------------------
+
+function opponentOf(color) { return color === 'white' ? 'black' : 'white'; }
+
+function kingKeyOf(color, boardState) {
+  for (const [key, occupant] of boardState) {
+    if (occupant.piece === 'K' && occupant.color === color) return key;
+  }
+  return null; // shouldn't happen in a normal game
+}
+
+// All squares `color` currently attacks -- i.e. could capture on,
+// if something were there. For pawns this is ONLY the two diagonal
+// capture squares (their forward move is not an attack). For every
+// other piece it's identical to their normal move destinations,
+// since sliding/stepping moves already land on the first enemy
+// piece encountered (see slideMoves/stepMoves above).
+function attackedSquares(color, boardState) {
+  const attacked = new Set();
+  boardState.forEach((occupant, key) => {
+    if (occupant.color !== color) return;
+    const cell = cellByKey[key];
+    if (occupant.piece === 'P') {
+      ACTIVE_VARIANT.pawnCaptureDirs[color].forEach(dir => {
+        const [aq, ar] = addVec(cell.q, cell.r, dir);
+        const k = cellKey(aq, ar);
+        if (validCellKeys.has(k)) attacked.add(k);
+      });
+      return;
+    }
+    let destinations = [];
+    if (occupant.piece === 'R') destinations = slideMoves(cell.q, cell.r, color, boardState, ORTHO_DIRS);
+    else if (occupant.piece === 'B') destinations = slideMoves(cell.q, cell.r, color, boardState, DIAG_DIRS);
+    else if (occupant.piece === 'Q') destinations = slideMoves(cell.q, cell.r, color, boardState, ALL_DIRS);
+    else if (occupant.piece === 'K') destinations = stepMoves(cell.q, cell.r, color, boardState, ALL_DIRS);
+    else if (occupant.piece === 'N') destinations = stepMoves(cell.q, cell.r, color, boardState, KNIGHT_OFFSETS);
+    destinations.forEach(k => attacked.add(k));
+  });
+  return attacked;
+}
+
+function isInCheck(color, boardState) {
+  const kingKey = kingKeyOf(color, boardState);
+  if (!kingKey) return false;
+  return attackedSquares(opponentOf(color), boardState).has(kingKey);
+}
+
+function cloneBoard(boardState) {
+  const clone = new Map();
+  boardState.forEach((occupant, key) => clone.set(key, { ...occupant }));
+  return clone;
+}
+
+// Applies a move to a board (mutating it in place) without any of
+// the game-flow side effects (turn switching, promotion UI, etc.)
+// -- used for "what if" simulation during legality checking.
+// capturedKey defaults to the destination square, but differs for
+// en passant (the captured pawn isn't standing on the destination).
+function applyMoveToBoard(boardState, fromKey, toKey, capturedKey) {
+  const moving = boardState.get(fromKey);
+  boardState.delete(capturedKey || toKey);
+  boardState.delete(fromKey);
+  boardState.set(toKey, moving);
+}
+
+// Fully applies a move to a board (MUTATING it in place): captures,
+// castling's rook, promotion, and the resulting en passant window.
+// This is the ONE authoritative implementation of "what happens to
+// the board when this move is played" -- used both by the live game
+// (via finishMove) and by the computer player's search tree, which
+// calls it many thousands of times per move and needs it to stay
+// fast and side-effect-free (no DOM, no history, no persistence).
+// Keeping this as a single shared function (rather than the search
+// tree re-implementing its own copy) is deliberate: two separate
+// implementations of "how a move mutates the board" would be a real
+// correctness risk if they ever drifted out of sync with each other.
+//
+// Returns { capturedPiece, promoted, enPassantTargets } -- info the
+// caller may need (move history, capture tray) that isn't itself
+// part of the board's own state.
+function applyFullMove(boardState, move, fromKey, movingColor, promoteTo) {
+  const fromCell = cellByKey[fromKey];
+  const toKey = move.to;
+  const destCell = cellByKey[toKey];
+
+  const moving = boardState.get(fromKey);
+  const origPieceType = moving.piece;
+
+  const capturedKey = move.capturedKey || toKey;
+  const capturedPiece = boardState.get(capturedKey);
+  boardState.delete(capturedKey); // handles normal captures AND en passant
+  boardState.delete(fromKey);
+  moving.moved = true;
+
+  const promoted = origPieceType === 'P' && !!promoteTo && promoteTo !== 'P';
+  if (promoted) moving.piece = promoteTo;
+
+  boardState.set(toKey, moving);
+
+  // Castling moves the rook too, as part of the same turn.
+  if (move.castling) {
+    const rook = boardState.get(move.castling.rookFromKey);
+    boardState.delete(move.castling.rookFromKey);
+    rook.moved = true;
+    boardState.set(move.castling.rookToKey, rook);
+  }
+
+  // Set up the en passant window for the opponent's very next move:
+  // any multi-step first move creates one, covering EVERY
+  // intermediate square passed over (a 3-step move, e.g. Shafran's
+  // centre-file pawns, passes over two squares, either capturable).
+  // Only applies to a genuine forward ADVANCE, never to a capture
+  // (direct or en passant itself) -- see the git-blame-worthy bug
+  // this fixed: a capturing pawn's destination sits on a different
+  // file, so walking forward from its origin looking for that
+  // destination would never find it, generating a string of bogus
+  // targets instead.
+  let enPassantTargets = [];
+  if (origPieceType === 'P' && !move.capture) {
+    const forward = PAWN_FORWARD[movingColor];
+    let [stepQ, stepR] = [fromCell.q, fromCell.r];
+    while (true) {
+      stepQ += forward[0]; stepR += forward[1];
+      if (stepQ === destCell.q && stepR === destCell.r) break; // reached the actual destination
+      enPassantTargets.push({ key: cellKey(stepQ, stepR), capturedKey: toKey, color: opponentOf(movingColor) });
+      if (enPassantTargets.length > 4) break; // safety guard, should never trigger
+    }
+  }
+
+  return { capturedPiece, promoted, enPassantTargets };
+}
+
+// The real, fully-legal move list: pseudo-legal moves, minus any
+// that would leave the mover's own king in check.
+function legalMovesForSquare(q, r, boardState, enPassantTargets) {
+  const fromKey = cellKey(q, r);
+  const occupant = boardState.get(fromKey);
+  if (!occupant) return [];
+  const pseudoLegal = generateMoves(q, r, boardState, enPassantTargets);
+  return pseudoLegal.filter(({ to, capturedKey }) => {
+    const sim = cloneBoard(boardState);
+    applyMoveToBoard(sim, fromKey, to, capturedKey);
+    return !isInCheck(occupant.color, sim);
+  });
+}
+
+// Does `color` have at least one fully-legal move anywhere on the
+// board? Used to detect checkmate (in check + no moves) and
+// stalemate (not in check + no moves).
+function hasAnyLegalMove(color, boardState, enPassantTargets) {
+  for (const [key, occupant] of boardState) {
+    if (occupant.color !== color) continue;
+    const cell = cellByKey[key];
+    if (legalMovesForSquare(cell.q, cell.r, boardState, enPassantTargets).length > 0) return true;
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------
+// 4b. COMPUTER PLAYER
+//     Deliberately scoped small: fixed search depth (no difficulty
+//     levels), a basic material+mobility evaluator (no positional
+//     tuning), no move ordering, and everything runs synchronously
+//     on the main thread (no Web Worker) -- accepted trade-off is a
+//     brief pause while it "thinks" rather than the added complexity
+//     of offloading the search. Benchmarked directly before picking
+//     the depth: depth 2 runs in roughly 0.5-2 seconds depending on
+//     position (slower in open positions with more mobile pieces,
+//     despite fewer total pieces on the board); depth 3 measured
+//     ~17 SECONDS on the opening position alone -- far too slow
+//     without a worker, so this stays fixed at depth 2. That's a
+//     real, honest limitation: the AI sees its own move and your
+//     best reply, but not further tactics beyond that. It plays
+//     reasonable, legal chess and won't hang a piece for free, but
+//     it is genuinely myopic by design, not by accident.
+//
+//     Because generateMoves/legalMovesForSquare/applyFullMove are
+//     already pure functions with zero DOM dependency (kept that way
+//     from the very start of this project specifically so an AI or
+//     online play could be added later without touching the rules
+//     engine), this entire section only calls existing functions --
+//     it doesn't reimplement any chess logic of its own, which also
+//     means it automatically inherits every variant's own rules
+//     (Shafran's castling, McCooey's f-pawn exception, etc.) for free.
+// ---------------------------------------------------------------
+
+const AI_SEARCH_DEPTH = 2;
+const AI_NODE_BUDGET = 60000; // circuit breaker against pathological worst-case positions
+const AI_MATE_SCORE = 100000;
+
+// Every legal move for every piece of one colour, each move tagged
+// with which piece it belongs to (legalMovesForSquare only returns
+// moves for a single already-known square).
+function allLegalMovesForColor(boardState, color, enPassantTargets) {
+  const moves = [];
+  boardState.forEach((occupant, key) => {
+    if (occupant.color !== color) return;
+    const cell = cellByKey[key];
+    legalMovesForSquare(cell.q, cell.r, boardState, enPassantTargets).forEach(move => {
+      moves.push({ ...move, fromKey: key });
+    });
+  });
+  return moves;
+}
+
+// Cheap mobility estimate for the evaluator: PSEUDO-legal move count
+// (generateMoves), not the fully check-filtered legalMovesForSquare.
+// Skipping the "does this leave my king in check" simulation here is
+// deliberate -- the evaluator runs at every leaf of the search tree,
+// and that simulation (which clones the whole board per candidate
+// move) is the expensive part of this engine. A rough mobility
+// signal is enough for a basic evaluator; it doesn't need to be exact.
+function pseudoMoveCount(boardState, color) {
+  let count = 0;
+  boardState.forEach((occupant, key) => {
+    if (occupant.color !== color) return;
+    const cell = cellByKey[key];
+    count += generateMoves(cell.q, cell.r, boardState, []).length;
+  });
+  return count;
+}
+
+// Material (using the same PIECE_VALUE table the captured-tray
+// display already uses) plus a small mobility term, weighted low
+// enough to never override material but still nudge the AI toward
+// more active positions when material is otherwise equal. Returns a
+// score from `color`'s own perspective: positive is good for them.
+function evaluatePosition(boardState, color) {
+  let material = 0;
+  boardState.forEach(occupant => {
+    const value = PIECE_VALUE[occupant.piece] || 0;
+    material += occupant.color === color ? value : -value;
+  });
+  const opponent = opponentOf(color);
+  const mobility = (pseudoMoveCount(boardState, color) - pseudoMoveCount(boardState, opponent)) * 0.02;
+  return material + mobility;
+}
+
+// Negamax with alpha-beta pruning. Always returns a score from
+// `color`'s perspective (the side about to move at this node) --
+// negated as it's returned up the tree, which is what lets one
+// function handle both "my best move" and "their best reply" without
+// separate maximizing/minimizing branches. `budget` is a mutable
+// { count } object shared across the whole search so the node cap
+// applies globally, not per-branch.
+function negamax(boardState, color, enPassantTargets, depth, alpha, beta, budget) {
+  budget.count++;
+  if (budget.count > AI_NODE_BUDGET) return evaluatePosition(boardState, color);
+
+  const moves = allLegalMovesForColor(boardState, color, enPassantTargets);
+  if (moves.length === 0) {
+    // No legal moves: checkmate (bad -- but prefer being mated LATER,
+    // i.e. with more search depth remaining, over being mated sooner)
+    // or stalemate (treated as a flat draw here regardless of a
+    // variant's own partial-stalemate scoring -- that's a game-level
+    // scoring nuance the search doesn't need to optimize toward).
+    return isInCheck(color, boardState) ? -AI_MATE_SCORE + depth : 0;
+  }
+  if (depth === 0) return evaluatePosition(boardState, color);
+
+  let best = -Infinity;
+  for (const move of moves) {
+    const cloned = cloneBoard(boardState);
+    const result = applyFullMove(cloned, move, move.fromKey, color, 'Q'); // AI always promotes to queen -- see note on chooseComputerMove
+    const score = -negamax(cloned, opponentOf(color), result.enPassantTargets, depth - 1, -beta, -alpha, budget);
+    if (score > best) best = score;
+    if (score > alpha) alpha = score;
+    if (alpha >= beta) break; // prune -- opponent already has a better option elsewhere
+    if (budget.count > AI_NODE_BUDGET) break;
+  }
+  return best;
+}
+
+// Top-level: evaluate every legal move for `color` one ply deeper
+// than negamax's own recursion (so the search consistently reaches
+// AI_SEARCH_DEPTH plies total), then pick RANDOMLY among the top 3
+// candidates by score, rather than always the single best. This is
+// deliberate imperfection, not a bug: with no randomness anywhere
+// else in the search, the computer would otherwise be fully
+// deterministic -- the exact same move, every time, given the exact
+// same sequence of prior moves -- which makes it feel mechanical and,
+// over repeated games, fully "solvable" through memorization. Picking
+// among a few good-but-not-always-identical options fixes both.
+//
+// A regular "find THE best move" alpha-beta search tightens its
+// pruning bound across sibling root moves as it goes, which is safe
+// there: a pruned branch is guaranteed to be "not better than what's
+// already been found," and that's all you need to correctly rule out
+// a single move. It's NOT enough to correctly rank the 2nd and 3rd
+// place candidates against each other, though -- a pruned score is
+// only a bound, and a genuinely good move could get cut short and
+// reported as worse than it really is, wrongly knocking it out of the
+// top 3. This uses the standard extension of alpha-beta for exactly
+// this "find the top K" case instead: prune a candidate only once K
+// candidates have already been found AND this one can't beat the
+// WORST of those K -- which is a safe thing to know (it definitely
+// isn't in the top K either way) without needing that candidate's
+// exact score. Until K candidates exist yet, nothing gets pruned, so
+// the first few moves always get their exact value. Pruning WITHIN
+// each move's own subtree still happens exactly as it always has.
+// How strongly the weighted pick below favours the top move over its
+// runners-up. Tuned by testing actual candidate score gaps (not
+// guessed): at 1.0, a genuinely close set of options still gets a
+// healthy, meaningful spread (~44/32/24%), while a clearly-better
+// move -- winning a free minor piece, say -- gets taken the large
+// majority of the time (~93%) rather than being a near coin-flip.
+// Anything scoring near mate (tens of thousands of points above
+// everything else) ends up essentially guaranteed regardless of this
+// constant, since the gap so thoroughly swamps it either way.
+const AI_MOVE_PICK_TEMPERATURE = 1.0;
+
+// Picks one move from a small set of {move, score} candidates,
+// weighted by score rather than uniformly -- a checkmate or a free
+// queen should be taken almost every time, not merely 1-in-3 like the
+// other two candidates, while two options that are genuinely close in
+// value should still feel like a real toss-up. This is a softmax:
+// weight = exp((score - bestScore) / T). Subtracting the best score
+// first is a standard numerical-stability trick, not just tidiness --
+// it keeps the best move's own weight at a safe exp(0) = 1 and every
+// other weight safely between 0 and 1, regardless of how large the
+// raw scores get (a mate score is tens of thousands of points; naively
+// exponentiating that directly would overflow to Infinity).
+function weightedPick(candidates) {
+  const bestScore = Math.max(...candidates.map(c => c.score));
+  const weights = candidates.map(c => Math.exp((c.score - bestScore) / AI_MOVE_PICK_TEMPERATURE));
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+  let r = Math.random() * totalWeight;
+  for (let i = 0; i < candidates.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return candidates[i];
+  }
+  return candidates[candidates.length - 1]; // floating-point fallback, should rarely if ever trigger
+}
+
+function chooseComputerMove(boardState, color, enPassantTargets) {
+  const moves = allLegalMovesForColor(boardState, color, enPassantTargets);
+  if (moves.length === 0) return null;
+
+  const K = Math.min(3, moves.length);
+  const budget = { count: 0 };
+  const topK = []; // kept sorted descending by score, length capped at K
+
+  for (const move of moves) {
+    const alpha = topK.length === K ? topK[K - 1].score : -Infinity;
+    const cloned = cloneBoard(boardState);
+    const result = applyFullMove(cloned, move, move.fromKey, color, 'Q');
+    const score = -negamax(cloned, opponentOf(color), result.enPassantTargets, AI_SEARCH_DEPTH - 1, -Infinity, -alpha, budget);
+
+    if (topK.length < K || score > alpha) {
+      topK.push({ move, score });
+      topK.sort((a, b) => b.score - a.score);
+      if (topK.length > K) topK.pop();
+    }
+  }
+
+  return weightedPick(topK).move;
+}
+
+// Runs the search and actually plays the result through the SAME
+// tryMove()/finishMove() path a human move takes -- same animation,
+// same move-history entry, same persistence -- rather than mutating
+// boardState directly. The one difference: if the chosen move is a
+// promotion, the picker is resolved to a queen immediately in the
+// same synchronous pass rather than ever being shown, so it never
+// visibly flashes on screen for a computer move.
+function makeComputerMove() {
+  if (gameOver || pendingPromotion || turn !== computerColor || !vsComputer) return;
+  // This is the definitive gate against playing while the menu is
+  // still open -- scheduleComputerMoveIfNeeded() checks this too, but
+  // only at the moment it's ASKED to schedule a move; when New Game
+  // resets the board (which itself schedules a move if the computer
+  // plays White) before the menu has actually opened yet, that early
+  // check can't see the menu coming. Re-checking here, right as the
+  // (deferred, by up to 1350ms) move actually tries to execute,
+  // covers that ordering gap. hideMenu() re-schedules once the menu
+  // genuinely closes, so the move isn't lost, just held back.
+  if (menuOverlay.classList.contains('show')) return;
+
+  const move = chooseComputerMove(boardState, computerColor, enPassantTargets);
+  if (!move) return; // defensive -- shouldn't happen if the game isn't already over
+
+  const fromCell = cellByKey[move.fromKey];
+  selectedKey = move.fromKey;
+  legalMoves = legalMovesForSquare(fromCell.q, fromCell.r, boardState, enPassantTargets);
+  tryMove(move.to);
+  if (pendingPromotion) choosePromotion('Q');
+  clearSelection();
+}
+
+// Called after any move settles (including a fresh/restored game at
+// startup) to check whether it's now the computer's turn. Shows the
+// "thinking" state immediately, then defers the actual (synchronous,
+// potentially slow, main-thread-blocking) search until any animation
+// that's still in flight has genuinely finished.
+//
+// This matters more than it might look: the search runs synchronously
+// on the same thread the browser uses to paint new frames, so while
+// it's running, NOTHING can render -- including a piece still
+// mid-slide from the human's own move, or the board still mid-flip.
+// Starting the search too early doesn't make it run "during" that
+// animation; it freezes the animation in place until the search
+// finishes, then the animation jumps straight to its end state. The
+// only way to truly run the search alongside an animation would be a
+// Web Worker (a genuinely separate thread) -- a real architectural
+// step up for this project, since the pure rules-engine functions the
+// search calls would need to be shared with (or duplicated into) that
+// worker's own script. Waiting out whatever's already animating is
+// the simpler fix: it can't overlap the two, but it stops the search
+// from visibly breaking one that's already in progress.
+//
+// The wait is longer when auto-flip is on: the flip doesn't even
+// START until 350ms after the move (so the move itself is visible
+// first) and then takes another 900ms to complete, well past the
+// piece-slide's own ~320ms -- so THAT's the animation to wait out in
+// that case, not the slide.
+function scheduleComputerMoveIfNeeded() {
+  if (!vsComputer || gameOver || pendingPromotion || turn !== computerColor) return;
+  // Don't let the computer start playing while the menu is still open
+  // on top of the board -- most relevantly, when it plays White and
+  // New Game just reset the board (making it White's move again)
+  // right as the menu opened. hideMenu() re-checks this once the
+  // menu actually closes.
+  if (menuOverlay.classList.contains('show')) return;
+  updateTurnIndicator();
+  const delay = autoFlip ? 1350 : 450;
+  setTimeout(makeComputerMove, delay);
+}
+
+// ---------------------------------------------------------------
+// 5. GAME STATE + INTERACTION
+// ---------------------------------------------------------------
+
+// ---------------------------------------------------------------
+// 5. GAME STATE + INTERACTION
+//    boardState, turn, selectedKey, etc. are declared up in
+//    initGame()'s scope (section 3) and assigned fresh every time
+//    a game starts -- nothing here needs its own initialization.
+// ---------------------------------------------------------------
+
+let flipped = false;
+let autoFlip = true; // matches the auto-flip checkbox's default checked state
+let vsComputer = false; // when on, the computer plays whichever colour computerColor says
+let computerColor = 'black'; // 'white' or 'black' -- which side the computer plays when vsComputer is on
+
+// The orientation auto-flip (and a few other "snap to the right
+// side" moments) should aim for. Normally that's just whoever's turn
+// it is -- sensible for two humans passing the device back and
+// forth. Against the computer, though, there's no second person to
+// show the other side to, so the board should just stay facing the
+// HUMAN's own side permanently, whichever colour that is, instead of
+// flipping back and forth on the computer's own turns.
+function desiredFlipState() {
+  if (vsComputer) return computerColor === 'white'; // face the human's side: flipped if they're Black
+  return turn === 'black';
+}
+
+// Repositions every coordinate label's offset+rotation together,
+// based on the CURRENT flip state -- entirely via the `transform`
+// attribute, never by touching x/y again after creation. That's the
+// key fix here: a previous version of this function set the offset
+// via the y ATTRIBUTE directly, which isn't covered by the CSS
+// transition that animates `transform` -- so it snapped instantly
+// while the rotation animated smoothly around it, producing a jarring
+// "labels jump up, then the board catches up to them" effect during
+// any flip. Expressing everything as one combined transform fixes
+// that by construction: x/y stay permanently fixed at each label's
+// true cell-centre (set once at creation), and BOTH the offset
+// (toward what's normally the "bottom" of the hex) and the
+// counter-rotation (for reading orientation) live inside the single
+// `transform` string, which the existing CSS transition already
+// animates smoothly as one motion.
+//
+// This also happens to remove the need to compute the offset
+// direction conditionally on flip state at all: SVG applies the
+// rightmost transform function first, so `rotate(-angle) translate(0
+// d)` always translates by the SAME constant +d, and lets the
+// rotation itself flip that offset to the correct side as a natural
+// consequence of the geometry -- exactly the correction the old code
+// was computing by hand.
+function positionCoordLabels() {
+  const angle = flipped ? 180 : 0;
+  document.querySelectorAll('.coord-label').forEach(el => {
+    const cx = el.getAttribute('x');
+    const cy = el.getAttribute('y');
+    el.setAttribute('transform', `rotate(${-angle} ${cx} ${cy}) translate(0 ${size * 0.55})`);
+  });
+}
+
+function setFlipped(value) {
+  flipped = value;
+  const angle = flipped ? 180 : 0;
+  boardGroup.setAttribute('transform', `rotate(${angle} ${boardCenterX} ${boardCenterY})`);
+  // Counter-rotate by the OPPOSITE angle, animated with identical
+  // timing to the board's own rotation above. Because +angle (board)
+  // and -angle (piece) change in lockstep, they cancel at every
+  // instant of the transition, not just at the start/end -- so
+  // pieces glide along with the board while staying upright the
+  // whole time, instead of spinning independently.
+  positionCoordLabels();
+  document.querySelectorAll('.piece-inner').forEach(el => {
+    // Fixed local pivot (25,25 -- the centre of the piece's own 0-0-
+    // 50-50 viewBox) rather than a board-position-derived one, so
+    // this stays correct even while the piece is mid-slide.
+    el.setAttribute('transform', `rotate(${-angle} 25 25)`);
+  });
+}
+
+document.getElementById('undo-btn').addEventListener('click', undoMove);
+document.getElementById('flip-btn').addEventListener('click', () => setFlipped(!flipped));
+document.getElementById('auto-flip-checkbox').addEventListener('change', (e) => {
+  autoFlip = e.target.checked;
+  if (autoFlip) setFlipped(desiredFlipState()); // snap to the side about to move
+  savePrefs();
+});
+const computerColorRow = document.getElementById('computer-color-row');
+function updateComputerColorRowVisibility() {
+  computerColorRow.classList.toggle('hidden', !vsComputer);
+}
+
+document.getElementById('vs-computer-checkbox').addEventListener('change', (e) => {
+  vsComputer = e.target.checked;
+  savePrefs();
+  updateComputerColorRowVisibility();
+  updateTurnIndicator(); // may need to switch to/from the "thinking" label immediately
+  if (autoFlip) setFlipped(desiredFlipState()); // e.g. turned on while the board happened to be facing Black
+  scheduleComputerMoveIfNeeded(); // e.g. turned on mid-game while it's already Black's turn
+});
+
+function setComputerColorFromHumanChoice(humanChoice) {
+  computerColor = humanChoice === 'white' ? 'black' : 'white';
+  savePrefs();
+  updateTurnIndicator();
+  if (autoFlip) setFlipped(desiredFlipState());
+  scheduleComputerMoveIfNeeded(); // e.g. switched sides mid-game while it's now the computer's turn
+}
+document.getElementById('human-color-white').addEventListener('change', (e) => {
+  if (e.target.checked) setComputerColorFromHumanChoice('white');
+});
+document.getElementById('human-color-black').addEventListener('change', (e) => {
+  if (e.target.checked) setComputerColorFromHumanChoice('black');
+});
+
+function updateTurnIndicator() {
+  if (gameOver) {
+    turnIndicator.className = 'gameover';
+    turnIndicator.textContent = gameOverMessage;
+    return;
+  }
+  turnIndicator.className = turn;
+  const moveNumber = Math.floor(moveHistory.length / 2) + 1;
+  const count = `<span class="move-count">Move ${moveNumber}</span>`;
+  if (vsComputer && turn === computerColor) {
+    const colorLabel = turn === 'white' ? 'White' : 'Black';
+    turnIndicator.innerHTML = `<span class="swatch"></span>${colorLabel} is thinking…${count}`;
+    return;
+  }
+  const inCheck = isInCheck(turn, boardState);
+  const status = inCheck ? '<span class="status">— in check</span>' : '';
+  turnIndicator.innerHTML = `<span class="swatch"></span>${turn === 'white' ? 'White' : 'Black'} to move${status}${count}`;
+}
+
+// Builds standard-style algebraic notation for a completed move,
+// reusing the file+rank labels already computed for every cell.
+// e.g. "Nf5xg4+" (knight from f5 captures on g4, giving check).
+function moveNotation({ pieceType, fromLabel, toLabel, capture, promoted, promotedTo, enPassant, checkmate, check, castling }) {
+  const suffix = checkmate ? '#' : (check ? '+' : '');
+  if (castling) {
+    const flankLetter = castling.flank === 'queenside' ? 'Q' : 'B';
+    const body = castling.kind === 'long' ? '0-0-0' : '0-0';
+    return `${flankLetter}-${body}${suffix}`;
+  }
+  const prefix = pieceType === 'P' ? '' : pieceType;
+  const sep = capture ? 'x' : '-';
+  const promo = promoted ? `=${promotedTo}` : '';
+  const epSuffix = enPassant ? ' e.p.' : '';
+  return `${prefix}${fromLabel}${sep}${toLabel}${promo}${epSuffix}${suffix}`;
+}
+
+function renderMoveHistory() {
+  if (moveHistory.length === 0) {
+    moveHistoryList.innerHTML = '<div class="move-empty">No moves yet.</div>';
+    return;
+  }
+  const rows = [];
+  for (let i = 0; i < moveHistory.length; i += 2) {
+    const num = i / 2 + 1;
+    const white = moveHistory[i] ? moveHistory[i].notation : '';
+    const black = moveHistory[i + 1] ? moveHistory[i + 1].notation : '';
+    rows.push(
+      `<div class="move-row"><span class="move-num">${num}.</span>` +
+      `<span class="move-white">${white}</span>` +
+      `<span class="move-black">${black}</span></div>`
+    );
+  }
+  moveHistoryList.innerHTML = rows.join('');
+  moveHistoryList.scrollTop = moveHistoryList.scrollHeight;
+}
+
+// Standard relative piece values, used only for display ordering
+// (highest-value capture shown first, like most chess UIs) and the
+// material-advantage number -- has no effect on legality or scoring.
+const PIECE_VALUE = { Q: 9, R: 5, B: 3, N: 3, P: 1, K: 0 };
+
+function renderCapturedRow(container, pieces, color) {
+  container.innerHTML = '';
+  const sorted = [...pieces].sort((a, b) => PIECE_VALUE[b] - PIECE_VALUE[a]);
+  sorted.forEach(pieceType => {
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icon.setAttribute('viewBox', '0 0 50 50');
+    icon.setAttribute('class', 'captured-piece-icon');
+    icon.innerHTML = instantiatePieceArt(PIECE_ART_MERIDA[color][pieceType]);
+    container.appendChild(icon);
+  });
+}
+
+function renderCapturedTray() {
+  // capturedByWhite holds the pieces White has TAKEN -- which are
+  // BLACK pieces -- and vice versa, so the colour passed to each row
+  // is the opponent's, not the capturing side's.
+  renderCapturedRow(capturedByWhiteEl, capturedByWhite, 'black');
+  renderCapturedRow(capturedByBlackEl, capturedByBlack, 'white');
+
+  const whiteMaterial = capturedByWhite.reduce((sum, p) => sum + PIECE_VALUE[p], 0);
+  const blackMaterial = capturedByBlack.reduce((sum, p) => sum + PIECE_VALUE[p], 0);
+  const diff = whiteMaterial - blackMaterial;
+  materialDiffEl.textContent = diff === 0 ? '' : (diff > 0 ? `White +${diff}` : `Black +${-diff}`);
+}
+
+function updateCheckHighlight() {
+  document.querySelectorAll('.cell.in-check').forEach(el => el.classList.remove('in-check'));
+  if (gameOver) return;
+  if (isInCheck(turn, boardState)) {
+    const key = kingKeyOf(turn, boardState);
+    const poly = svg.querySelector(`.cell[data-cell-key="${key}"]`);
+    if (poly) poly.classList.add('in-check');
+  }
+}
+
+// Merida's original files use an internal gradient id="a". Reused
+// as-is for every piece of the same type/colour on the board, that
+// id would collide (SVG ids are document-global, even inside nested
+// <svg> elements) -- so each rendered instance gets its own unique
+// suffix on both the id="..." declaration and its url(#...) / xlink
+// references, keeping the gradient correctly self-contained per copy.
+let pieceArtInstanceCounter = 0;
+function instantiatePieceArt(rawMarkup) {
+  const suffix = `-i${pieceArtInstanceCounter++}`;
+  return rawMarkup
+    .replace(/id="([^"]+)"/g, (_, id) => `id="${id}${suffix}"`)
+    .replace(/url\(#([^)]+)\)/g, (_, id) => `url(#${id}${suffix})`)
+    .replace(/xlink:href="#([^"]+)"/g, (_, id) => `xlink:href="#${id}${suffix}"`);
+}
+
+function renderPieces() {
+  piecesLayer.innerHTML = '';
+  const artSize = size * 1.5; // fills most of the hex without crowding its border
+  boardState.forEach((occupant, key) => {
+    const cell = cellByKey[key];
+    const { x, y } = axialToPixel(cell.q, cell.r, size);
+
+    const art = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    art.setAttribute('x', x - artSize / 2);
+    art.setAttribute('y', y - artSize / 2);
+    art.setAttribute('width', artSize);
+    art.setAttribute('height', artSize);
+    art.setAttribute('viewBox', '0 0 50 50');
+    art.setAttribute('class', 'piece-art');
+    art.dataset.cellKey = key;
+
+    // Flip counter-rotation lives on this INNER element, pivoting
+    // around the fixed centre of its own local 0-0-50-50 viewBox
+    // (25,25) -- NOT around the piece's position on the board. That
+    // decoupling matters: the outer <svg>'s x/y (and, during a move
+    // animation, its slide transform) can change freely without ever
+    // invalidating this rotation, since it never depended on position
+    // in the first place. The old approach (rotating the outer
+    // element around its own absolute board coordinates) went stale
+    // the instant a piece moved, which is what caused pieces to
+    // briefly flash to a mirrored square during animation.
+    const inner = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    inner.setAttribute('class', 'piece-inner');
+    if (flipped) inner.setAttribute('transform', 'rotate(-180 25 25)');
+    inner.innerHTML = instantiatePieceArt(PIECE_ART_MERIDA[occupant.color][occupant.piece]);
+    art.appendChild(inner);
+
+    piecesLayer.appendChild(art);
+  });
+}
+
+function renderHighlights() {
+  highlightLayer.innerHTML = '';
+  legalMoves.forEach(({ to, capture }) => {
+    const cell = cellByKey[to];
+    const { x, y } = axialToPixel(cell.q, cell.r, size);
+    const el = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    el.setAttribute('cx', x);
+    el.setAttribute('cy', y);
+    if (capture) {
+      el.setAttribute('r', size * 0.62);
+      el.setAttribute('class', 'capture-ring');
+    } else {
+      el.setAttribute('r', size * 0.16);
+      el.setAttribute('class', 'move-dot');
+    }
+    highlightLayer.appendChild(el);
+  });
+}
+
+function clearSelection() {
+  selectedKey = null;
+  legalMoves = [];
+  renderHighlights();
+  document.querySelectorAll('.cell.selected').forEach(el => el.classList.remove('selected'));
+}
+
+function selectCell(key) {
+  const occupant = boardState.get(key);
+  if (!occupant || occupant.color !== turn) return;
+  selectedKey = key;
+  const cell = cellByKey[key];
+  legalMoves = legalMovesForSquare(cell.q, cell.r, boardState, enPassantTargets);
+  renderHighlights();
+}
+
+function showGameOver(message) {
+  gameOver = true;
+  gameOverMessage = message;
+  updateTurnIndicator(); // finishMove already called this once before gameOver was set; refresh to show the message
+}
+
+function tryMove(toKey) {
+  const move = legalMoves.find(m => m.to === toKey);
+  if (!move) return false;
+
+  const moving = boardState.get(selectedKey);
+  const origPieceType = moving.piece;
+  const fromCell = cellByKey[selectedKey];
+  const fromLabel = fromCell.label;
+  const movingColor = moving.color;
+  const destCell = cellByKey[toKey];
+
+  const isPromotionRank = movingColor === 'white'
+    ? destCell.rank === fileHeights[destCell.file]
+    : destCell.rank === fileMinRanks[destCell.file];
+  const isPromotion = origPieceType === 'P' && isPromotionRank;
+
+  const context = { move, fromKey: selectedKey, toKey, fromCell, fromLabel, movingColor, destCell };
+
+  if (isPromotion) {
+    // Pause here: don't touch boardState yet. The move only actually
+    // happens once the player picks a piece in the promotion picker,
+    // which calls finishMove itself with the chosen type.
+    pendingPromotion = context;
+    showPromotionPicker(movingColor);
+    return true;
+  }
+
+  finishMove(context, origPieceType);
+  return true;
+}
+
+// Applies a move to the board and runs everything that follows it --
+// en passant bookkeeping, turn switch, notation, check/checkmate
+// detection. Shared by the normal move path and the promotion-choice
+// path (called once a piece is picked), parameterized by
+// chosenPieceType so a promoting pawn ends up as whatever the player
+// chose rather than being hardcoded to a queen.
+// Full-state deep copy, taken right before a move is applied, so
+// undo can restore to it later. Piece objects are cloned (not just
+// the Map) -- finishMove mutates a piece's own object in place
+// (.moved, .piece on promotion), and without cloning, that mutation
+// would silently corrupt an already-taken snapshot pointing at the
+// same object.
+function snapshotState() {
+  const clonedBoard = new Map();
+  boardState.forEach((piece, key) => clonedBoard.set(key, { ...piece }));
+  return {
+    boardState: clonedBoard,
+    turn,
+    enPassantTargets: enPassantTargets.map(t => ({ ...t })),
+    capturedByWhite: [...capturedByWhite],
+    capturedByBlack: [...capturedByBlack],
+    moveHistory: moveHistory.map(m => ({ ...m })),
+  };
+}
+
+// Animates a completed move rather than snapping straight to the
+// final render. Works by grabbing the ALREADY-RENDERED DOM elements
+// for the squares involved (found via the data-cell-key attribute
+// renderPieces() stamps on each one) and sliding them via the
+// "invert and play" technique: jump the element's authoritative x/y
+// straight to the final position, immediately counter that with an
+// equal-and-opposite translate offset (transition disabled, so
+// nothing visibly moves yet), force the browser to paint that
+// starting frame, then release the offset back to zero WITH the
+// transition enabled -- which is what actually animates the slide.
+// This uses `transform`, the same mechanism already proven reliable
+// for the board-flip animation, rather than transitioning the SVG
+// x/y presentation attributes directly (which didn't animate
+// reliably in practice).
+//
+// Deliberately does NOT do a bulk renderPieces() resync afterward.
+// An earlier version did, timed to run shortly after the slide
+// finishes -- but when auto-flip is active, that resync would fire
+// WHILE the board's own 900ms flip transition is still mid-flight,
+// and destroying/recreating every piece element at that moment snaps
+// them straight to their final flip-rotation state, killing the
+// smooth flip animation. Instead, every case is handled with a
+// fully targeted DOM update that never touches any OTHER piece:
+// captures fade out and remove themselves on their own timer,
+// promotion swaps just the moved piece's inner artwork in place.
+const MOVE_ANIM_MS = 320;
+
+function animateMoveAndRender(fromKey, toKey, capturedKey, castling, promotion) {
+  const artSize = size * 1.5;
+  const findArt = key => piecesLayer.querySelector(`[data-cell-key="${key}"]`);
+
+  function slideTo(el, fromKeyForEl, toKeyForEl) {
+    if (!el) return;
+    const oldCell = cellByKey[fromKeyForEl];
+    const newCell = cellByKey[toKeyForEl];
+    const oldPos = axialToPixel(oldCell.q, oldCell.r, size);
+    const newPos = axialToPixel(newCell.q, newCell.r, size);
+    const dx = oldPos.x - newPos.x;
+    const dy = oldPos.y - newPos.y;
+
+    el.setAttribute('x', newPos.x - artSize / 2);
+    el.setAttribute('y', newPos.y - artSize / 2);
+    el.dataset.cellKey = toKeyForEl;
+
+    el.classList.remove('sliding'); // no transition yet -- this jump must be instant/invisible
+    el.setAttribute('transform', `translate(${dx} ${dy})`);
+    el.getBoundingClientRect(); // force a style flush so the browser commits the line above first
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.classList.add('sliding'); // NOW enable the transition
+        el.setAttribute('transform', 'translate(0 0)');
+      });
+    });
+  }
+
+  // Fade out whatever was captured (ordinary capture or en passant --
+  // capturedKey already points at the piece's REAL square either way,
+  // even when that differs from the destination square), then remove
+  // it from the DOM once the fade finishes.
+  if (capturedKey) {
+    const capturedEl = findArt(capturedKey);
+    if (capturedEl) {
+      capturedEl.classList.add('capture-fade');
+      setTimeout(() => capturedEl.remove(), 300);
+    }
+  }
+
+  const moverEl = findArt(fromKey);
+  slideTo(moverEl, fromKey, toKey);
+  if (castling) slideTo(findArt(castling.rookFromKey), castling.rookFromKey, castling.rookToKey);
+
+  // Promotion: swap the moved piece's artwork once the slide finishes,
+  // rather than mid-flight -- reads as "pawn arrives, then becomes a
+  // queen" instead of an odd glyph-swap while still moving.
+  if (promotion && moverEl) {
+    setTimeout(() => {
+      const inner = moverEl.querySelector('.piece-inner');
+      if (inner) inner.innerHTML = instantiatePieceArt(PIECE_ART_MERIDA[promotion.color][promotion.piece]);
+    }, MOVE_ANIM_MS + 40);
+  }
+}
+
+function finishMove({ move, fromKey, toKey, fromCell, fromLabel, movingColor, destCell }, chosenPieceType) {
+  moveSnapshots.push(snapshotState());
+
+  const origPieceType = boardState.get(fromKey).piece;
+  const capturedKey = move.capturedKey || toKey; // needed below for the capture-fade animation
+
+  const result = applyFullMove(boardState, move, fromKey, movingColor, chosenPieceType);
+  const { capturedPiece, promoted } = result;
+  enPassantTargets = result.enPassantTargets;
+
+  if (move.capture && capturedPiece) {
+    (movingColor === 'white' ? capturedByWhite : capturedByBlack).push(capturedPiece.piece);
+  }
+
+  const promotionInfo = promoted ? { color: movingColor, piece: chosenPieceType } : null;
+  animateMoveAndRender(fromKey, toKey, capturedKey, move.castling, promotionInfo);
+
+  turn = turn === 'white' ? 'black' : 'white';
+  if (autoFlip) {
+    // A short pause lets the move register visually before the board
+    // starts rotating; the setTimeout duration is also more than
+    // long enough for the freshly-rendered pieces above to get a
+    // committed frame first, so the transition has something to
+    // animate from rather than snapping straight to the end state.
+    pendingFlipTimeout = setTimeout(() => setFlipped(desiredFlipState()), 350);
+  }
+
+  const inCheck = isInCheck(turn, boardState);
+  const isCheckmate = inCheck && !hasAnyLegalMove(turn, boardState, enPassantTargets);
+
+  moveHistory.push({
+    color: movingColor,
+    notation: moveNotation({
+      pieceType: origPieceType,
+      fromLabel,
+      toLabel: destCell.label,
+      capture: move.capture,
+      promoted,
+      promotedTo: chosenPieceType,
+      enPassant: !!move.enPassant,
+      check: inCheck,
+      checkmate: isCheckmate,
+      castling: move.castling && {
+        kind: move.castling.kind,
+        flank: ACTIVE_VARIANT.castlingRookFlanks[movingColor][cellByKey[move.castling.rookFromKey].label],
+      },
+    }),
+  });
+  renderMoveHistory();
+  renderCapturedTray();
+  updateUndoButtonState();
+
+  updateTurnIndicator();
+  updateCheckHighlight();
+
+  if (!hasAnyLegalMove(turn, boardState, enPassantTargets)) {
+    if (inCheck) {
+      const winner = turn === 'white' ? 'Black' : 'White';
+      showGameOver(`Checkmate — ${winner} wins.`);
+    } else if (ACTIVE_VARIANT.stalemateResult === 'partial') {
+      // e.g. Gliński's rules: the side that delivered stalemate (the
+      // one who just moved) scores 3/4 of a point, the stalemated
+      // side 1/4 -- not an even draw.
+      const stalemated = turn === 'white' ? 'White' : 'Black';
+      const deliverer = turn === 'white' ? 'Black' : 'White';
+      showGameOver(`Stalemate — ${deliverer} scores 3/4, ${stalemated} scores 1/4.`);
+    } else {
+      showGameOver('Stalemate — draw.');
+    }
+  }
+
+  saveGameState();
+  scheduleComputerMoveIfNeeded();
+}
+
+function showPromotionPicker(color) {
+  promotionOptionsEl.innerHTML = '';
+  ['Q', 'R', 'B', 'N'].forEach(pieceType => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'promotion-option';
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icon.setAttribute('viewBox', '0 0 50 50');
+    icon.innerHTML = instantiatePieceArt(PIECE_ART_MERIDA[color][pieceType]);
+    btn.appendChild(icon);
+    btn.addEventListener('click', () => choosePromotion(pieceType));
+    promotionOptionsEl.appendChild(btn);
+  });
+  promotionModal.classList.add('show');
+}
+
+function choosePromotion(pieceType) {
+  promotionModal.classList.remove('show');
+  const context = pendingPromotion;
+  pendingPromotion = null;
+  finishMove(context, pieceType);
+  clearSelection();
+}
+
+function updateUndoButtonState() {
+  undoBtn.disabled = moveSnapshots.length === 0;
+}
+
+function undoMove() {
+  // Mid-promotion-picker, there's no coherent single state to revert
+  // to (the in-progress move hasn't touched the board yet, and the
+  // picker's stashed squares would go stale under a reverted board) --
+  // simplest safe behaviour is to just ignore undo until it's resolved.
+  if (pendingPromotion || moveSnapshots.length === 0) return;
+
+  clearTimeout(pendingFlipTimeout); // don't let a queued auto-flip fire after we've rewound past it
+  pendingFlipTimeout = null;
+
+  let snap = moveSnapshots.pop();
+  // Playing against the computer: a single-ply undo would land back
+  // on the COMPUTER's own turn, which just makes it immediately move
+  // again -- pop a second ply too, so undo always hands control back
+  // to the human instead of being a no-op from their perspective.
+  if (vsComputer && snap.turn === computerColor && moveSnapshots.length > 0) {
+    snap = moveSnapshots.pop();
+  }
+  boardState = snap.boardState;
+  turn = snap.turn;
+  enPassantTargets = snap.enPassantTargets;
+  capturedByWhite = snap.capturedByWhite;
+  capturedByBlack = snap.capturedByBlack;
+  moveHistory = snap.moveHistory;
+
+  gameOver = false; // any snapshot is, by construction, a pre-move (non-terminal) state
+  gameOverMessage = '';
+
+  clearSelection();
+  renderPieces();
+  updateTurnIndicator();
+  updateCheckHighlight();
+  renderMoveHistory();
+  renderCapturedTray();
+  updateUndoButtonState();
+
+  if (autoFlip) {
+    // One frame's delay so the freshly-rendered pieces above get a
+    // committed frame first -- same reasoning as the auto-flip-after-
+    // a-move case: without it, the transition has nothing to animate
+    // from and just snaps instead.
+    requestAnimationFrame(() => setFlipped(desiredFlipState()));
+  }
+
+  saveGameState();
+}
+
+function onCellClick(poly) {
+  if (gameOver || pendingPromotion) return;
+  if (vsComputer && turn === computerColor) return; // the computer's turn -- board isn't interactive
+  const key = poly.dataset.cellKey;
+  if (selectedKey && tryMove(key)) {
+    clearSelection();
+    return;
+  }
+  clearSelection();
+  if (boardState.get(key)) {
+    poly.classList.add('selected');
+    selectCell(key);
+  }
+}
+
+document.getElementById('variant-select').addEventListener('change', (e) => {
+  initGame(VARIANTS[e.target.value]);
+  savePrefs();
+});
+document.getElementById('new-game-btn').addEventListener('click', () => {
+  // Reset FIRST, then show the menu -- this guarantees the menu is
+  // always reached with a genuinely fresh (zero-move) game already
+  // showing behind it, which is what makes it safe for the menu's own
+  // controls (variant, vs-computer, play-as colour) to apply live as
+  // they're changed: there's no longer any "already in progress"
+  // game for a live change to disrupt, since New Game is now the
+  // ONLY way back into the menu.
+  initGame(ACTIVE_VARIANT); // restart the SAME variant
+  showMenu();
+});
+document.getElementById('start-game-btn').addEventListener('click', hideMenu);
+document.getElementById('theme-select').addEventListener('change', (e) => {
+  applyTheme(THEMES[e.target.value]);
+  savePrefs();
+});
+
+// --- Startup: restore preferences and any in-progress game, falling
+// back to sensible defaults (Wood & Felt, McCooey's, fresh game)
+// wherever nothing was saved or the saved data no longer applies
+// (e.g. a saved game for a variant that isn't the saved theme/variant
+// preference for some reason -- just start that variant fresh rather
+// than risk restoring a mismatched state). ---
+const savedPrefs = loadPrefs();
+const startupTheme = (savedPrefs && THEMES[savedPrefs.themeId]) || THEMES.woodFelt;
+const startupVariant = (savedPrefs && VARIANTS[savedPrefs.variantId]) || VARIANTS.mccooey;
+autoFlip = savedPrefs ? !!savedPrefs.autoFlip : true;
+vsComputer = savedPrefs ? !!savedPrefs.vsComputer : false;
+computerColor = (savedPrefs && (savedPrefs.computerColor === 'white' || savedPrefs.computerColor === 'black'))
+  ? savedPrefs.computerColor : 'black';
+
+applyTheme(startupTheme);
+document.getElementById('theme-select').value = startupTheme.id;
+document.getElementById('variant-select').value = startupVariant.id;
+document.getElementById('auto-flip-checkbox').checked = autoFlip;
+document.getElementById('vs-computer-checkbox').checked = vsComputer;
+document.getElementById(computerColor === 'white' ? 'human-color-black' : 'human-color-white').checked = true;
+updateComputerColorRowVisibility();
+
+const savedGame = loadGameState();
+const restoreState = (savedGame && savedGame.variantId === startupVariant.id) ? savedGame : null;
+initGame(startupVariant, restoreState);
+
+// The menu only appears on a genuinely first-ever visit (nothing
+// saved at all yet) -- any later visit, whatever state the game is
+// in, drops straight into it. The only other way back to the menu is
+// the explicit "Change Settings" button.
+if (!savedPrefs) {
+  showMenu();
+}
+</script>
+
+</body>
+</html>
