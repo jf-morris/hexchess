@@ -1438,7 +1438,7 @@ function initGame(variant, restoreState) {
 
   const pts = cells.map(c => axialToPixel(c.q, c.r, size));
   const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
-  const pad = size * 0.85; /*Formerly: const pad = size * 1.4;*/
+  const pad = size * 1.4; /*Formerly: const pad = size * 1.4; REVERTED back to 1.41 from tested 0.85. Affects inside of board box, not outside.*/
   const minX = Math.min(...xs) - pad, maxX = Math.max(...xs) + pad;
   const minY = Math.min(...ys) - pad, maxY = Math.max(...ys) + pad;
   const width = maxX - minX, height = maxY - minY;
