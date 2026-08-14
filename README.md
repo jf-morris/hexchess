@@ -22,7 +22,7 @@ If you find bugs or have feedback, please do let me know.
 
 
 
-[**Play now**](https://your-username.github.io/your-repo-name/) *(update this link once GitHub Pages is enabled)*
+[**Play now**](https://jf-morris.github.io/hexchess/)
 
 
 
