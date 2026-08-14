@@ -65,5 +65,5 @@ This project is licensed under the [GNU GPL v3](LICENSE). It embeds the Merida c
 * Piece artwork: Merida, by Armando Hernández Marroquín (see License above)
 * Fonts: [Google Fonts](https://fonts.google.com/) (Fraunces, Archivo Black, Space Grotesk, Monoton, Inter)
 * Built in partnership with [Claude](https://claude.com)
-* Inspired by CGP Grey's \[Hexagons are the Bestagons](https://www.youtube.com/watch?v=thOifuHs6eY)
+* Inspired by CGP Grey's [Hexagons are the Bestagons](https://www.youtube.com/watch?v=thOifuHs6eY)
 
