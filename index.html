@@ -48,7 +48,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 16px 1px 40px; /* Formerly: padding: 16px 12px 40px;*/
+    padding: 16px 1px 40px;
     transition: background-color 0.3s ease, color 0.3s ease;
   }
 
@@ -92,7 +92,7 @@
 
   .board-wrap {
     margin-top: 10px;
-    padding: 1px; /* Formerly: padding: 10px;*/
+    padding: 1px;
     background: var(--panel);
     border-radius: var(--radius-panel);
     box-shadow: 0 20px 50px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.03);
@@ -410,11 +410,21 @@
     align-items: center;
     gap: 16px;
     margin-top: 10px;
+    width: 100%; /* without this, .game-layout shrinks to fit its content instead of
+                     filling body's available width, and board-wrap's own width:100%
+                     resolves against that already-shrunken box instead -- so the
+                     board ends up inset from the screen edge no matter how far
+                     body's own padding is reduced */
   }
   @media (min-width: 900px) {
     .game-layout {
       flex-direction: row;
       align-items: flex-start;
+      justify-content: center; /* board-wrap's own max-width now caps it below what
+                                    flex:1 would otherwise grow it to, so without this
+                                    the leftover row space just sits unused on the
+                                    right instead of balancing the board+panel as a
+                                    unit -- exactly the left-heavy look being reported */
       gap: 32px;
     }
   }
@@ -423,8 +433,8 @@
      from the board -- so mobile gets noticeably tighter margins than
      desktop, where there's room to spare. */
   @media (max-width: 480px) {
-    body { padding: 6px 0px 20px; } /* Previously 10px 6px 28px */
-    .board-wrap { padding: 0px; border-radius: 8px; } /* Previously padding 6px border-radius 8px */
+    body { padding: 10px 0px 28px; }
+    .board-wrap { padding: 0px; border-radius: 8px; }
   }
 
   .side-panel {
@@ -435,7 +445,18 @@
     max-width: 340px;
   }
   @media (min-width: 900px) {
-    .board-wrap { flex: 1 1 auto; }
+    .board-wrap {
+      flex: 1 1 auto;
+      max-width: 600px; /* balances against the 320px side panel and keeps the
+                            board within a typical laptop's viewport height --
+                            736px was fine when a layout bug was accidentally
+                            capping growth below it, but now that the board can
+                            actually REACH its max-width, 736px alone was both
+                            visually unbalanced against the panel and tall
+                            enough to need scrolling to see the bottom row. */
+    }
+    #board-svg { max-height: 78vh; } /* safety net for shorter/narrower browser windows specifically --
+                                          adapts to the actual available height rather than assuming one */
     .side-panel { flex: 0 0 320px; max-width: 320px; align-items: stretch; padding-top: 6px; }
   }
 
@@ -622,7 +643,9 @@
   variants played on boards of hexagonal cells rather than the traditional
   8×8 grid, each with its own board shape, starting array, and rulesets.
   Learn the rules and read more about its history on
-  <a href="https://en.wikipedia.org/wiki/Hexagonal_chess" target="_blank" rel="noopener">Wikipedia</a>. Learn more about this Hex Chess project on <a href="https://github.com/jf-morris/hexchess" target="_blank" rel="noopener">GitHub</a>. 
+  <a href="https://en.wikipedia.org/wiki/Hexagonal_chess" target="_blank" rel="noopener">Wikipedia</a>.
+  Learn more about this Hex Chess project on
+  <a href="https://github.com/jf-morris/hexchess" target="_blank" rel="noopener">GitHub</a>.
 </footer>
 
 <footer id="credits-note">
@@ -1438,7 +1461,7 @@ function initGame(variant, restoreState) {
 
   const pts = cells.map(c => axialToPixel(c.q, c.r, size));
   const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
-  const pad = size * 1.4; /*Formerly: const pad = size * 1.4; REVERTED back to 1.41 from tested 0.85. Affects inside of board box, not outside.*/
+  const pad = size * 1.4;
   const minX = Math.min(...xs) - pad, maxX = Math.max(...xs) + pad;
   const minY = Math.min(...ys) - pad, maxY = Math.max(...ys) + pad;
   const width = maxX - minX, height = maxY - minY;
