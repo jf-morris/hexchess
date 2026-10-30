@@ -204,7 +204,7 @@
     font-size: 0.9rem;
     color: var(--ink);
   }
-  #computer-color-row.hidden { display: none; }
+  #computer-color-row.hidden, #computer-level-row.hidden { display: none; }
   .menu-radio-group {
     display: flex;
     gap: 16px;
@@ -284,6 +284,12 @@
   .cell.mid:hover   { fill: var(--cell-mid-hover); }
   .cell.dark:hover  { fill: var(--cell-dark-hover); }
   .cell.selected { fill: var(--accent) !important; }
+  .last-move-cell {
+    fill: var(--lastmove-color, rgba(70, 130, 200, 0.4));
+    pointer-events: none;
+  }
+  #gameover-new-game-btn { display: none; margin-top: 10px; align-self: flex-start; }
+  #gameover-new-game-btn.show { display: inline-block; }
 
   .move-dot {
     fill: var(--move-dot-color, rgba(20, 24, 18, 0.55));
@@ -567,6 +573,7 @@
 
   <div class="side-panel">
     <div id="turn-indicator" class="white"><span class="swatch"></span>White to move</div>
+    <button id="gameover-new-game-btn" class="flip-btn" type="button">New game</button>
     <div id="hover-readout">&nbsp;</div>
 
     <div class="captured-tray">
@@ -623,6 +630,14 @@
     <div class="menu-row menu-row-checkbox">
       <label><input type="checkbox" id="vs-computer-checkbox"> Play vs Computer</label>
     </div>
+    <div class="menu-row" id="computer-level-row">
+      <label for="computer-level-select">Difficulty</label>
+      <select id="computer-level-select">
+        <option value="easy">Easy</option>
+        <option value="medium">Medium</option>
+        <option value="hard">Hard</option>
+      </select>
+    </div>
     <div class="menu-row" id="computer-color-row">
       <label>Play as</label>
       <div class="menu-radio-group">
@@ -642,7 +657,8 @@
   <strong>About Hex Chess</strong> — Hexagonal chess is a family of chess
   variants played on boards of hexagonal cells rather than the traditional
   8×8 grid, each with its own board shape, starting array, and rulesets.
-  Learn the rules and read more about its history on
+  <a id="rules-link" href="https://en.wikipedia.org/wiki/Hexagonal_chess" target="_blank" rel="noopener">Learn the rules</a>
+  and read more about its history on
   <a href="https://en.wikipedia.org/wiki/Hexagonal_chess" target="_blank" rel="noopener">Wikipedia</a>.
   Learn more about this Hex Chess project on
   <a href="https://github.com/jf-morris/hexchess" target="_blank" rel="noopener">GitHub</a>.
@@ -684,6 +700,7 @@ function savePrefs() {
       autoFlip,
       vsComputer,
       computerColor,
+      computerLevel,
     }));
   } catch (e) { /* ignore -- see note above */ }
 }
@@ -721,6 +738,7 @@ function saveGameState() {
       flipped: flippedToSave,
       gameOver,
       gameOverMessage,
+      lastMove,
     }));
   } catch (e) { /* ignore -- see note above */ }
 }
@@ -1110,6 +1128,7 @@ const THEMES = {
       '--cell-dark-hover': '#8f6440',
       '--line': '#10160f',
       '--accent': '#6fae8e',
+      '--lastmove-color': 'rgba(40, 140, 255, 0.55)',
       '--font-display': "Georgia, 'Times New Roman', serif",
       '--font-display-style': 'normal',
       '--font-display-weight': '400',
@@ -1152,6 +1171,7 @@ const THEMES = {
       '--cell-dark-hover': '#c94f38',
       '--line': '#0f1424',
       '--accent': '#2f6f6a',
+      '--lastmove-color': 'rgba(150, 60, 210, 0.6)',
       '--font-display': "'Archivo Black', sans-serif",
       '--font-display-style': 'normal',
       '--font-display-weight': '400',
@@ -1199,6 +1219,7 @@ const THEMES = {
       '--cell-dark-hover': '#296a58',
       '--line': '#26362f',
       '--accent': '#de6c83',
+      '--lastmove-color': 'rgba(70, 140, 235, 0.42)',
       '--font-display': "'Fraunces', serif",
       '--font-display-style': 'normal',
       '--font-display-weight': '600',
@@ -1250,6 +1271,7 @@ const THEMES = {
       // used this same red, which made a selected piece and a
       // checked king look identical.
       '--accent': '#3c7add',
+      '--lastmove-color': 'rgba(245, 180, 40, 0.55)',
       '--font-display': "'Inter', 'Helvetica Neue', sans-serif",
       '--font-display-style': 'normal',
       '--font-display-weight': '500',
@@ -1289,6 +1311,7 @@ const THEMES = {
       '--cell-dark-hover': '#3266b5',
       '--line': '#030a24',
       '--accent': '#eded4c',
+      '--lastmove-color': 'rgba(70, 225, 205, 0.42)',
       '--font-display': "'Fraunces', serif",
       '--font-display-style': 'italic',
       '--font-display-weight': '400',
@@ -1336,6 +1359,7 @@ const THEMES = {
       '--cell-dark-hover': '#5f1fff',
       '--line': '#0a1010',
       '--accent': '#00b8ff',
+      '--lastmove-color': 'rgba(130, 240, 110, 0.74)',
       '--font-display': "'Monoton', cursive",
       '--font-display-style': 'normal',
       '--font-display-weight': '400',
@@ -1451,7 +1475,29 @@ let capturedByWhite, capturedByBlack; // arrays of piece-type letters (the OPPON
 let pendingPromotion; // stashed move context while the promotion picker is open, or null
 let moveSnapshots; // stack of full-state snapshots, one per completed move, for undo
 let pendingFlipTimeout; // id of a scheduled auto-flip, so undo can cancel one that hasn't fired yet
-let piecesLayer, highlightLayer;
+let piecesLayer, highlightLayer, lastMoveLayer;
+let lastMove; // { fromKey, toKey } of the most recent move, or null
+
+const RULES_URLS = {
+  glinski: "https://en.wikipedia.org/wiki/Hexagonal_chess#Gli%C5%84ski's_hexagonal_chess",
+  mccooey: "https://en.wikipedia.org/wiki/Hexagonal_chess#McCooey's_hexagonal_chess",
+  shafran: "https://en.wikipedia.org/wiki/Hexagonal_chess#Shafran's_hexagonal_chess",
+};
+
+function renderLastMove() {
+  if (!lastMoveLayer) return;
+  lastMoveLayer.innerHTML = '';
+  if (!lastMove) return;
+  [lastMove.fromKey, lastMove.toKey].forEach(key => {
+    const cell = cellByKey[key];
+    if (!cell) return;
+    const { x, y } = axialToPixel(cell.q, cell.r, size);
+    const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    poly.setAttribute('points', hexPointsAttr(x, y, size));
+    poly.setAttribute('class', 'last-move-cell');
+    lastMoveLayer.appendChild(poly);
+  });
+}
 
 function initGame(variant, restoreState) {
   ACTIVE_VARIANT = variant;
@@ -1538,6 +1584,7 @@ function initGame(variant, restoreState) {
     flipped = restoreState.flipped;
     gameOver = restoreState.gameOver;
     gameOverMessage = restoreState.gameOverMessage;
+    lastMove = restoreState.lastMove || null;
   } else {
     boardState = freshBoardState;
     turn = 'white';
@@ -1548,6 +1595,7 @@ function initGame(variant, restoreState) {
     flipped = desiredFlipState(); // faces the human's side by default -- matters when the computer plays White
     gameOver = false;
     gameOverMessage = '';
+    lastMove = null;
   }
 
   selectedKey = null;
@@ -1561,10 +1609,13 @@ function initGame(variant, restoreState) {
 
   piecesLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   highlightLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  lastMoveLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  boardGroup.appendChild(lastMoveLayer); // under selection highlights
   boardGroup.appendChild(highlightLayer); // below pieces, above cells
   boardGroup.appendChild(piecesLayer);
 
   variantSubtitle.textContent = variant.name;
+  document.getElementById('rules-link').href = RULES_URLS[variant.id];
   footerNote.textContent = `${variant.name}. Click a piece, then a highlighted cell to move.`;
 
   // Match the board's own rotation to a restored flip state. Safe to
@@ -1576,6 +1627,7 @@ function initGame(variant, restoreState) {
   boardGroup.setAttribute('transform', `rotate(${flipped ? 180 : 0} ${boardCenterX} ${boardCenterY})`);
   positionCoordLabels(); // now that `flipped` is finalized -- see its own comment for why this matters
 
+  renderLastMove();
   renderPieces();
   updateTurnIndicator();
   updateCheckHighlight();
@@ -1989,7 +2041,21 @@ function hasAnyLegalMove(color, boardState, enPassantTargets) {
 //     (Shafran's castling, McCooey's f-pawn exception, etc.) for free.
 // ---------------------------------------------------------------
 
-const AI_SEARCH_DEPTH = 2;
+// Difficulty levels. Strength comes mainly from search depth and the
+// capture-only follow-up (quiescence); randomness (how many of the best
+// moves are candidates, and how flat the weighted pick is) adds variety
+// and the occasional lapse on the easier levels.
+//   searchDepth: plies searched from the computer's move (1 = just its
+//                move and the evaluation; 2 = also your best reply)
+//   quiescence:  max extra capture-only plies (0 = off: misses recaptures)
+//   topK / temperature: see chooseComputerMove / weightedPick
+const AI_LEVELS = {
+  easy:   { searchDepth: 1, quiescence: 0, topK: 5, temperature: 1.5 },
+  medium: { searchDepth: 1, quiescence: 4, topK: 3, temperature: 1.0 },
+  hard:   { searchDepth: 2, quiescence: 4, topK: 3, temperature: 0.5 },
+};
+let computerLevel = 'medium';
+let aiConfig = AI_LEVELS.medium; // set at the start of each chooseComputerMove
 const AI_NODE_BUDGET = 60000; // circuit breaker against pathological worst-case positions
 const AI_MATE_SCORE = 100000;
 
@@ -2041,6 +2107,73 @@ function evaluatePosition(boardState, color) {
   return material + mobility;
 }
 
+// applyFullMove promotes ANY pawn it is handed a promotion piece for,
+// so the search must only pass 'Q' for a move that genuinely reaches
+// the promotion rank (the same test tryMove uses) and 'P' (= no
+// promotion) otherwise. Passing 'Q' unconditionally turned every
+// pawn move in the search into a free queen, which badly skewed it.
+function aiPromotionChoice(boardState, move, fromKey, color) {
+  if (boardState.get(fromKey).piece !== 'P') return 'P';
+  const dest = cellByKey[move.to];
+  const onPromotionRank = color === 'white'
+    ? dest.rank === fileHeights[dest.file]
+    : dest.rank === fileMinRanks[dest.file];
+  return onPromotionRank ? 'Q' : 'P';
+}
+
+
+// Orders captures before quiet moves (biggest victim first, cheapest
+// attacker first) so alpha-beta prunes sooner. Pure ordering: it never
+// changes which moves exist, only the order they're tried in.
+function compareMovesCapturesFirst(boardState) {
+  const rank = m => {
+    if (!m.capture) return 0;
+    const victim = boardState.get(m.capturedKey || m.to);
+    const attacker = boardState.get(m.fromKey);
+    return 1 + (victim ? PIECE_VALUE[victim.piece] : 1) * 10 - (attacker ? PIECE_VALUE[attacker.piece] : 0);
+  };
+  return (a, b) => rank(b) - rank(a);
+}
+
+// Quiescence search: instead of scoring a position the instant the
+// main search runs out of depth (which can land mid-exchange, e.g.
+// right after a capture but before the recapture), keep playing out
+// CAPTURES ONLY until things settle. "Stand pat" lets the side to move
+// decline to capture if every capture makes things worse. Uses
+// pseudo-legal captures plus a king-safety check after each, which is
+// much cheaper than full legal generation; en passant is ignored here
+// (rare, and only affects these extra plies).
+function quiesce(boardState, color, alpha, beta, qdepth, budget) {
+  budget.count++;
+  const standPat = evaluatePosition(boardState, color);
+  if (qdepth === 0 || budget.count > AI_NODE_BUDGET) return standPat;
+  if (standPat >= beta) return standPat;
+  if (standPat > alpha) alpha = standPat;
+
+  const captures = [];
+  boardState.forEach((occupant, key) => {
+    if (occupant.color !== color) return;
+    const cell = cellByKey[key];
+    generateMoves(cell.q, cell.r, boardState, []).forEach(m => {
+      if (m.capture) captures.push({ ...m, fromKey: key });
+    });
+  });
+  captures.sort(compareMovesCapturesFirst(boardState));
+
+  let best = standPat;
+  for (const move of captures) {
+    const cloned = cloneBoard(boardState);
+    applyFullMove(cloned, move, move.fromKey, color, aiPromotionChoice(boardState, move, move.fromKey, color));
+    if (isInCheck(color, cloned)) continue; // illegal: leaves own king attacked
+    const score = -quiesce(cloned, opponentOf(color), -beta, -alpha, qdepth - 1, budget);
+    if (score > best) best = score;
+    if (score > alpha) alpha = score;
+    if (alpha >= beta) break;
+    if (budget.count > AI_NODE_BUDGET) break;
+  }
+  return best;
+}
+
 // Negamax with alpha-beta pruning. Always returns a score from
 // `color`'s perspective (the side about to move at this node) --
 // negated as it's returned up the tree, which is what lets one
@@ -2061,12 +2194,13 @@ function negamax(boardState, color, enPassantTargets, depth, alpha, beta, budget
     // scoring nuance the search doesn't need to optimize toward).
     return isInCheck(color, boardState) ? -AI_MATE_SCORE + depth : 0;
   }
-  if (depth === 0) return evaluatePosition(boardState, color);
+  if (depth === 0) return quiesce(boardState, color, alpha, beta, aiConfig.quiescence, budget);
 
+  moves.sort(compareMovesCapturesFirst(boardState));
   let best = -Infinity;
   for (const move of moves) {
     const cloned = cloneBoard(boardState);
-    const result = applyFullMove(cloned, move, move.fromKey, color, 'Q'); // AI always promotes to queen -- see note on chooseComputerMove
+    const result = applyFullMove(cloned, move, move.fromKey, color, aiPromotionChoice(boardState, move, move.fromKey, color));
     const score = -negamax(cloned, opponentOf(color), result.enPassantTargets, depth - 1, -beta, -alpha, budget);
     if (score > best) best = score;
     if (score > alpha) alpha = score;
@@ -2078,7 +2212,7 @@ function negamax(boardState, color, enPassantTargets, depth, alpha, beta, budget
 
 // Top-level: evaluate every legal move for `color` one ply deeper
 // than negamax's own recursion (so the search consistently reaches
-// AI_SEARCH_DEPTH plies total), then pick RANDOMLY among the top 3
+// the level's searchDepth plies total), then pick RANDOMLY among the top K
 // candidates by score, rather than always the single best. This is
 // deliberate imperfection, not a bug: with no randomness anywhere
 // else in the search, the computer would otherwise be fully
@@ -2104,15 +2238,11 @@ function negamax(boardState, color, enPassantTargets, depth, alpha, beta, budget
 // the first few moves always get their exact value. Pruning WITHIN
 // each move's own subtree still happens exactly as it always has.
 // How strongly the weighted pick below favours the top move over its
-// runners-up. Tuned by testing actual candidate score gaps (not
-// guessed): at 1.0, a genuinely close set of options still gets a
-// healthy, meaningful spread (~44/32/24%), while a clearly-better
-// move -- winning a free minor piece, say -- gets taken the large
-// majority of the time (~93%) rather than being a near coin-flip.
-// Anything scoring near mate (tens of thousands of points above
-// everything else) ends up essentially guaranteed regardless of this
-// constant, since the gap so thoroughly swamps it either way.
-const AI_MOVE_PICK_TEMPERATURE = 1.0;
+// runners-up. At 0.5 a clearly better move (winning a free pawn, say)
+// is taken most of the time, a free minor piece or more almost always,
+// while genuinely close options still get a real spread. Anything
+// scoring near mate ends up essentially guaranteed regardless, since
+// the gap so thoroughly swamps this constant.
 
 // Picks one move from a small set of {move, score} candidates,
 // weighted by score rather than uniformly -- a checkmate or a free
@@ -2127,7 +2257,7 @@ const AI_MOVE_PICK_TEMPERATURE = 1.0;
 // exponentiating that directly would overflow to Infinity).
 function weightedPick(candidates) {
   const bestScore = Math.max(...candidates.map(c => c.score));
-  const weights = candidates.map(c => Math.exp((c.score - bestScore) / AI_MOVE_PICK_TEMPERATURE));
+  const weights = candidates.map(c => Math.exp((c.score - bestScore) / aiConfig.temperature));
   const totalWeight = weights.reduce((sum, w) => sum + w, 0);
   let r = Math.random() * totalWeight;
   for (let i = 0; i < candidates.length; i++) {
@@ -2141,15 +2271,16 @@ function chooseComputerMove(boardState, color, enPassantTargets) {
   const moves = allLegalMovesForColor(boardState, color, enPassantTargets);
   if (moves.length === 0) return null;
 
-  const K = Math.min(3, moves.length);
+  aiConfig = AI_LEVELS[computerLevel] || AI_LEVELS.medium;
+  const K = Math.min(aiConfig.topK, moves.length);
   const budget = { count: 0 };
   const topK = []; // kept sorted descending by score, length capped at K
 
   for (const move of moves) {
     const alpha = topK.length === K ? topK[K - 1].score : -Infinity;
     const cloned = cloneBoard(boardState);
-    const result = applyFullMove(cloned, move, move.fromKey, color, 'Q');
-    const score = -negamax(cloned, opponentOf(color), result.enPassantTargets, AI_SEARCH_DEPTH - 1, -Infinity, -alpha, budget);
+    const result = applyFullMove(cloned, move, move.fromKey, color, aiPromotionChoice(boardState, move, move.fromKey, color));
+    const score = -negamax(cloned, opponentOf(color), result.enPassantTargets, aiConfig.searchDepth - 1, -Infinity, -alpha, budget);
 
     if (topK.length < K || score > alpha) {
       topK.push({ move, score });
@@ -2320,7 +2451,13 @@ document.getElementById('auto-flip-checkbox').addEventListener('change', (e) => 
 const computerColorRow = document.getElementById('computer-color-row');
 function updateComputerColorRowVisibility() {
   computerColorRow.classList.toggle('hidden', !vsComputer);
+  document.getElementById('computer-level-row').classList.toggle('hidden', !vsComputer);
 }
+
+document.getElementById('computer-level-select').addEventListener('change', (e) => {
+  if (AI_LEVELS[e.target.value]) computerLevel = e.target.value;
+  savePrefs();
+});
 
 document.getElementById('vs-computer-checkbox').addEventListener('change', (e) => {
   vsComputer = e.target.checked;
@@ -2346,6 +2483,7 @@ document.getElementById('human-color-black').addEventListener('change', (e) => {
 });
 
 function updateTurnIndicator() {
+  document.getElementById('gameover-new-game-btn').classList.toggle('show', !!gameOver);
   if (gameOver) {
     turnIndicator.className = 'gameover';
     turnIndicator.textContent = gameOverMessage;
@@ -2586,6 +2724,7 @@ function snapshotState() {
     capturedByWhite: [...capturedByWhite],
     capturedByBlack: [...capturedByBlack],
     moveHistory: moveHistory.map(m => ({ ...m })),
+    lastMove: lastMove ? { ...lastMove } : null,
   };
 }
 
@@ -2688,6 +2827,9 @@ function finishMove({ move, fromKey, toKey, fromCell, fromLabel, movingColor, de
 
   const promotionInfo = promoted ? { color: movingColor, piece: chosenPieceType } : null;
   animateMoveAndRender(fromKey, toKey, capturedKey, move.castling, promotionInfo);
+
+  lastMove = { fromKey, toKey };
+  renderLastMove();
 
   turn = turn === 'white' ? 'black' : 'white';
   if (autoFlip) {
@@ -2799,6 +2941,8 @@ function undoMove() {
   capturedByWhite = snap.capturedByWhite;
   capturedByBlack = snap.capturedByBlack;
   moveHistory = snap.moveHistory;
+  lastMove = snap.lastMove;
+  renderLastMove();
 
   gameOver = false; // any snapshot is, by construction, a pre-move (non-terminal) state
   gameOverMessage = '';
@@ -2841,7 +2985,7 @@ document.getElementById('variant-select').addEventListener('change', (e) => {
   initGame(VARIANTS[e.target.value]);
   savePrefs();
 });
-document.getElementById('new-game-btn').addEventListener('click', () => {
+function startNewGame() {
   // Reset FIRST, then show the menu -- this guarantees the menu is
   // always reached with a genuinely fresh (zero-move) game already
   // showing behind it, which is what makes it safe for the menu's own
@@ -2851,7 +2995,9 @@ document.getElementById('new-game-btn').addEventListener('click', () => {
   // ONLY way back into the menu.
   initGame(ACTIVE_VARIANT); // restart the SAME variant
   showMenu();
-});
+}
+document.getElementById('new-game-btn').addEventListener('click', startNewGame);
+document.getElementById('gameover-new-game-btn').addEventListener('click', startNewGame);
 document.getElementById('start-game-btn').addEventListener('click', hideMenu);
 document.getElementById('theme-select').addEventListener('change', (e) => {
   applyTheme(THEMES[e.target.value]);
@@ -2871,6 +3017,8 @@ autoFlip = savedPrefs ? !!savedPrefs.autoFlip : true;
 vsComputer = savedPrefs ? !!savedPrefs.vsComputer : false;
 computerColor = (savedPrefs && (savedPrefs.computerColor === 'white' || savedPrefs.computerColor === 'black'))
   ? savedPrefs.computerColor : 'black';
+computerLevel = (savedPrefs && AI_LEVELS[savedPrefs.computerLevel]) ? savedPrefs.computerLevel : 'medium';
+document.getElementById('computer-level-select').value = computerLevel;
 
 applyTheme(startupTheme);
 document.getElementById('theme-select').value = startupTheme.id;
@@ -2881,14 +3029,16 @@ document.getElementById(computerColor === 'white' ? 'human-color-black' : 'human
 updateComputerColorRowVisibility();
 
 const savedGame = loadGameState();
-const restoreState = (savedGame && savedGame.variantId === startupVariant.id) ? savedGame : null;
+// A finished game isn't worth resuming -- start fresh and show the menu.
+const savedGameFinished = !!(savedGame && savedGame.gameOver);
+const restoreState = (savedGame && !savedGameFinished && savedGame.variantId === startupVariant.id) ? savedGame : null;
 initGame(startupVariant, restoreState);
 
 // The menu only appears on a genuinely first-ever visit (nothing
 // saved at all yet) -- any later visit, whatever state the game is
 // in, drops straight into it. The only other way back to the menu is
 // the explicit "Change Settings" button.
-if (!savedPrefs) {
+if (!savedPrefs || savedGameFinished) {
   showMenu();
 }
 </script>
